@@ -1,0 +1,14 @@
+application:
+  hooks:
+    pre-app-build: npm run build
+  runtimeManifest:
+    packages:
+      customer:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/customer/actions.config.yaml
+
+productDependencies:
+  - code: COMMC
+    minVersion: 2.4.4
+    maxVersion: 2.4.8

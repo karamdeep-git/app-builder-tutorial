@@ -1,0 +1,43 @@
+create:
+  function: ../../actions/customer/create/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+
+  annotations:
+    require-adobe-auth: false
+    final: true
+
+get:
+  function: ../../actions/customer/get/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+
+  annotations:
+    require-adobe-auth: false
+    final: true
+
+list:
+  function: ../../actions/customer/list/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+
+  annotations:
+    require-adobe-auth: false
+    final: true
+
+delete:
+  function: ../../actions/customer/delete/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+
+  annotations:
+    require-adobe-auth: false
+    final: true
