@@ -9,6 +9,7 @@ import Login from "./Login";
 import Dashboard from "./Dashboard";
 import Indexing from "./Indexing";
 import CommandManager from "./CommandManager";
+import CategoryManager from "./CategoryManager";
 import { Home } from "./Home";
 import { About } from "./About";
 import kinexLogo from "url:../assets/kinex-logo.webp";
@@ -80,6 +81,7 @@ function App(props) {
                   <Route path="/" element={<ProductList ims={props.ims} />} />
                   <Route path="/dashboard" element={<Dashboard username={currentUser.username} ims={props.ims} />} />
                   <Route path="/indexing" element={<Indexing ims={props.ims} />} />
+                  <Route path="/categories" element={<CategoryManager ims={props.ims} />} />
                   <Route
                     path="/commands"
                     element={<CommandManager ims={props.ims} currentUser={currentUser.username} />}

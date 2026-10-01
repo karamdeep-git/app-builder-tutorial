@@ -28,6 +28,11 @@ application:
         actions:
           $include: ./actions-src/commands/actions.config.yaml
 
+      category:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/category/actions.config.yaml
+
 productDependencies:
   - code: COMMC
     minVersion: 2.4.4
