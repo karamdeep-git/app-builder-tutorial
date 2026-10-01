@@ -1,0 +1,102 @@
+list:
+  function: ../../actions/product/list/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+
+  annotations:
+    require-adobe-auth: false
+    final: true
+
+get:
+  function: ../../actions/product/get/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+
+  annotations:
+    require-adobe-auth: false
+    final: true
+
+update:
+  function: ../../actions/product/update/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_STORE_CODES: $COMMERCE_STORE_CODES
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
+    COMMERCE_ADMIN_USERNAME: $COMMERCE_ADMIN_USERNAME
+    COMMERCE_ADMIN_PASSWORD: $COMMERCE_ADMIN_PASSWORD
+
+  annotations:
+    require-adobe-auth: false
+    final: true
+
+delete:
+  function: ../../actions/product/delete/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_STORE_CODES: $COMMERCE_STORE_CODES
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
+
+  annotations:
+    require-adobe-auth: false
+    final: true
+
+events-consumer:
+  function: ../../actions/product/events-consumer/index.js
+  web: "no"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+
+  annotations:
+    require-adobe-auth: false
+    final: true
+
+search:
+  function: ../../actions/product/search/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_STORE_CODES: $COMMERCE_STORE_CODES
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
+
+  annotations:
+    require-adobe-auth: false
+    final: true
+
+categories:
+  function: ../../actions/product/categories/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_STORE_CODES: $COMMERCE_STORE_CODES
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
+
+  annotations:
+    require-adobe-auth: false
+    final: true

@@ -1,0 +1,11 @@
+login:
+  function: ../../actions/auth/login/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+
+  annotations:
+    require-adobe-auth: false
+    final: true

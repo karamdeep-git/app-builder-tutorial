@@ -8,7 +8,8 @@ import { getAdobeAccessToken } from "../io-auth/adobe-auth";
 import { getProviderName } from "./naming";
 
 export enum EventCode {
-  PRODUCT_CREATED = "...",
+  PRODUCT_SAVED = "com.adobe.commerce.observer.catalog_product_save_commit_after",
+  PRODUCT_DELETED = "com.adobe.commerce.observer.catalog_product_delete_commit_after",
 }
 
 export enum ProviderKey {

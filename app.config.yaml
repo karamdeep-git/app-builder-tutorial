@@ -8,6 +8,26 @@ application:
         actions:
           $include: ./actions-src/customer/actions.config.yaml
 
+      auth:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/auth/actions.config.yaml
+
+      product:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/product/actions.config.yaml
+
+      indexer:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/indexer/actions.config.yaml
+
+      commands:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/commands/actions.config.yaml
+
 productDependencies:
   - code: COMMC
     minVersion: 2.4.4
