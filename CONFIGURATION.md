@@ -98,6 +98,77 @@ workspace names and the deployed URLs (no keys):
 
 ---
 
+## 1a. Action authentication — `require-adobe-auth: true`
+
+Every web action the admin UI calls is annotated `require-adobe-auth: true` in its
+`actions.config.yaml`. On `aio app deploy`, the CLI renames each one to
+`__secured_<name>` (no longer web-reachable) and publishes a sequence under the
+original name that runs Adobe's IMS validator first
+(`/adobeio/shared-validators-v1/headless-v2`), so the action URLs in `config.json`
+don't change. A request only reaches our code if it carries:
+
+```text
+Authorization: Bearer <the logged-in user's IMS token>
+x-gw-ims-org-id: <the IMS org that token was issued for>
+```
+
+Anything else is rejected by the validator before our action even runs. The
+Magento admin login (`auth/login`) is now a *second* layer on top of this, not the
+only gate.
+
+**Where the token comes from:** only the Experience Cloud Shell gives the SPA an
+IMS token (`web-src/src/index.js` → `bootstrapInExcShell`). Every component already
+sends both headers when it has one. Opening the bare static URL
+(`https://4033606-testknm-stage.adobeio-static.net/index.html`) gets no token, so
+the app shows an "Open this app in Adobe Experience Cloud" screen instead of a login
+form that could never work. Use the shell URL `aio app deploy` prints:
+
+```text
+https://experience.adobe.com/?devMode=true#/custom-apps/?localDevUrl=https://4033606-testknm-stage.adobeio-static.net/index.html
+```
+
+**Who can open it:** the user's Adobe ID must belong to the org
+("Kinex Media Partner Sandbox") *and* have access to the same product profiles as
+the Stage workspace. That rule comes straight from the validator's own rejection
+message (confirmed against the deployed app):
+
+```text
+401 "request is invalid, reason: unauthorized. Please verify your organization ID and
+that the requesting user has access to the same product profiles as the workspace, or
+the user is the technical account for the workspace (User profile access can be
+checked in the Adobe Admin Console)."
+```
+
+So if a user gets that error, or `FORBIDDEN_BY_ROLE` in the shell (what blocked the
+first attempt at `require-adobe-auth: true` — see `SESSION_SUMMARY.md` §7), an org
+System Admin fixes it in Adobe Admin Console (`admin.adobe.com`) by adding that
+user to the workspace's product profiles. Not something this repo can change.
+
+**Deliberate exceptions** (enforced by `test/security-config.test.ts`, which fails
+if any other web action is missing the annotation):
+
+| Action | Why it has no IMS check |
+|---|---|
+| `storefront/stock` | Called by anonymous shoppers' browsers on the storefront, which have no IMS token. A shared secret in storefront JS would be public, so it wouldn't be real auth either. Kept safe by scope: read-only, one SKU's stock per call, ERP key never leaves the server, CORS limited to the configured origin. |
+| `order/events-consumer`, `product/events-consumer` | `web: "no"` — no public URL at all; only invocable with this namespace's Runtime credentials (I/O Events). aio ignores the annotation on non-web actions. |
+
+**Verifying after a deploy:**
+
+```bash
+# Without a token, every secured action must now refuse the call:
+curl -i https://4033606-testknm-stage.adobeio-static.net/api/v1/web/order/search
+# -> 401 {"error": "cannot authorize request, reason: missing authorization header"}
+#    from the validator - our action never ran
+```
+
+**Product thumbnails:** `product/image` is secured too, and a plain `<img src>` can't
+send an `Authorization` header, so `ProductList.js` fetches each thumbnail with the
+auth headers and renders it from a blob URL (`AuthenticatedThumbnail`). The action
+returns `Cache-Control: private` so no shared cache can replay an authenticated
+response.
+
+---
+
 ## 2. Adobe Commerce (Magento) credentials
 
 These you create yourself in Magento Admin, then hand-type into `.env`. This is the
@@ -140,7 +211,6 @@ COMMERCE_CONSUMER_KEY=<your-consumer-key>
 COMMERCE_CONSUMER_SECRET=<your-consumer-secret>
 COMMERCE_ACCESS_TOKEN=<your-access-token>
 COMMERCE_ACCESS_TOKEN_SECRET=<your-access-token-secret>
-COMMERCE_STORE_CODES=[]                 # leave as [] unless you need multi-store routing
 ```
 
 **Where you get them** — Magento Admin:
@@ -172,7 +242,6 @@ update:
   inputs:
     LOG_LEVEL: debug
     COMMERCE_BASE_URL: $COMMERCE_BASE_URL                       # <- from .env
-    COMMERCE_STORE_CODES: $COMMERCE_STORE_CODES                 # <- from .env
     COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY                # <- from .env
     COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET          # <- from .env
     COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN                # <- from .env
@@ -217,7 +286,6 @@ export interface CommerceParams {
   COMMERCE_CONSUMER_SECRET: string;
   COMMERCE_ACCESS_TOKEN: string;
   COMMERCE_ACCESS_TOKEN_SECRET: string;
-  COMMERCE_STORE_CODES: string;
 }
 ```
 
@@ -266,7 +334,65 @@ if (!params.COMMERCE_ADMIN_USERNAME || !params.COMMERCE_ADMIN_PASSWORD) {
 
 ---
 
-## 3. Action URLs (`web-src/src/config.json`) — generated, never hand-edited
+## 3. Storefront Stock Widget config — lives in Magento Admin, NOT `.env`
+
+Everything in §2 is a *credential* — something needed just to reach Magento at
+all, which is exactly why it has to live in `.env` (you can't fetch the key that
+unlocks a door from behind that same door). The Storefront Stock Widget's own
+settings are different: they're not credentials for talking to Magento, they're
+*operational config about a third-party system*, read fresh from Magento on every
+request using the OAuth1 keys from §2b. That means a store admin can change the
+ERP endpoint or rotate its key from Magento Admin with **zero `.env` edits and no
+`aio app deploy`**.
+
+**Where you set it** — Magento Admin:
+
+```text
+Magento Admin -> Stores -> Configuration -> General -> Storefront Stock Widget
+  Enabled                   -> turns the widget on/off (etc/config.xml default: enabled)
+  App Builder Action URL    -> the deployed storefront/stock action's own URL
+                               (so the Luma block knows what to call - see §3's
+                               config.json for where this value comes from)
+  External Stock API URL    -> base URL of your ERP/3PL stock system
+  External Stock API Key    -> sent as `Authorization: Bearer <key>` to that system
+                               (stored ENCRYPTED - Magento's `obscure` field type +
+                               Magento\Config\Model\Config\Backend\Encrypted)
+  Allowed Storefront Origin -> your storefront's own origin (scheme+host), used to
+                               restrict the action's CORS response to just this site
+```
+
+Defined in:
+`/Users/kinex/Sites/testapp/app/code/Kinex/StorefrontStock/etc/adminhtml/system.xml`
+
+**How the App Builder action reads it** — a dedicated, authenticated Magento REST
+endpoint, called with the *same* §2b OAuth1 client every other action already uses:
+
+```typescript
+// actions-src/storefront/stock/index.ts
+const client = AdobeCommerceClient.create(params, {
+  storeCode: "default",
+  storeUrl: params.COMMERCE_BASE_URL,
+});
+// Hits GET {COMMERCE_BASE_URL}rest/V1/kinex-storefront-stock/config - a route we
+// defined ourselves (see table in §4 below), not a core Magento endpoint.
+const config = await client.get("/kinex-storefront-stock/config");
+// config.external_stock_api_url / .external_stock_api_key / .allowed_origin
+```
+
+That route is served by
+`/Users/kinex/Sites/testapp/app/code/Kinex/StorefrontStock/Model/ConfigManagement.php`,
+which decrypts the API key server-side (`EncryptorInterface::decrypt()`) before
+handing it back — the plaintext key only ever exists in Magento's PHP process and
+this one HTTPS response, never written back to any file in either repo.
+
+**Why no `.env` entry at all:** earlier revisions of this feature *did* have
+`STOREFRONT_ALLOWED_ORIGIN` / `EXTERNAL_STOCK_API_URL` / `EXTERNAL_STOCK_API_KEY`
+in `.env` — moved out specifically so non-developers can reconfigure the ERP
+integration without touching this repo or redeploying.
+
+---
+
+## 4. Action URLs (`web-src/src/config.json`) — generated, never hand-edited
 
 ```jsonc
 // web-src/src/config.json (excerpt) — DO NOT edit this file by hand. It's
@@ -297,24 +423,211 @@ If an action you expect is missing from `config.json`, it means the action's
 
 ---
 
-## 4. Magento-side URLs used by the two custom PHP modules
+## 5. Magento-side URLs used by the four custom PHP modules
 
 These aren't `.env` values at all — they're Magento REST routes defined *by us*, in
-the two custom modules living directly in the Magento codebase (not this repo):
+the custom modules living directly in the Magento codebase (not this repo):
 
-| Route | Defined in |
-|---|---|
-| `/V1/kinex-reindex/*` | `/Users/kinex/Sites/testapp/app/code/Kinex/Reindex/etc/webapi.xml` |
-| `/V1/kinex-commands/*` | `/Users/kinex/Sites/testapp/app/code/Kinex/CommandManager/etc/webapi.xml` |
+| Route | Defined in | ACL resource |
+|---|---|---|
+| `/V1/kinex-reindex/*` | `/Users/kinex/Sites/testapp/app/code/Kinex/Reindex/etc/webapi.xml` | `Kinex_Reindex::reindex` |
+| `/V1/kinex-commands/*` | `/Users/kinex/Sites/testapp/app/code/Kinex/CommandManager/etc/webapi.xml` | `Kinex_CommandManager::execute` |
+| `/V1/kinex-storefront-stock/config` | `/Users/kinex/Sites/testapp/app/code/Kinex/StorefrontStock/etc/webapi.xml` | `Kinex_StorefrontStock::api` |
+| `/V1/kinex-admin-users*` | `/Users/kinex/Sites/testapp/app/code/Kinex/ZLF31QCAN/etc/webapi.xml` | `Kinex_ZLF31QCAN::api` |
 
-They're reached the exact same way as any other Commerce call — through
-`COMMERCE_BASE_URL` + the OAuth1 keys from §2b — because the Adobe Commerce
-Integration created in §2b already has full (`Magento_Backend::all`) Admin access,
-so no extra Magento-side permission grant was needed for these custom routes.
+They're all reached the exact same way as any other Commerce call — through
+`COMMERCE_BASE_URL` + the OAuth1 keys from §2b. The Adobe Commerce Integration
+created in §2b has full (`Magento_Backend::all`) Admin access, which is a wildcard
+over every ACL resource in the tree above — including each of these custom ones —
+so no extra Magento-side permission grant was needed when adding them. (A real
+footgun hit while building the third route: a module's own `acl.xml` must nest its
+resources at the *exact* real depth Magento core uses, e.g.
+`Magento_Backend::admin > ... > Magento_Backend::stores_settings > Magento_Config::config`
+— getting that wrong doesn't just break the new resource, it silently breaks
+Magento's *entire* ACL tree build for every integration.)
+
+**`Kinex_ZLF31QCAN` (Admin Users) needs a one-time manual step beyond install.**
+Its global `admin_user_authenticate_after` observer denies login to any admin
+user with no row in its `zlf31qcan` table — which is every pre-existing admin
+the first time this module is installed on a Magento instance. Before anyone
+tries to log in (including this app's own `auth/login` and the product-status
+sync's admin session login — both go through the same observer), run this once
+per existing admin:
+
+```bash
+# right after installing the module, before anyone tries to log in
+bin/magento kinex:zlf31qcan:activate --all
+# or one at a time:
+bin/magento kinex:zlf31qcan:activate <username>
+```
+
+(`Console/Command/ActivateAdminUserCommand.php` — also the only way back in if
+every admin user ever ends up inactive by mistake, since the App Builder UI
+itself needs a working admin login to load.)
 
 ---
 
-## 5. Quick checklist — setting this up on a new machine
+## 5a. Order Management — default Magento REST only, no custom module
+
+Unlike the four modules above, `actions-src/order/*` (search, get, cancel, hold,
+unhold) adds **zero** new code to the Magento side. Everything it does is a thin
+proxy over Magento's own default REST API, reached the same way as every other
+Commerce call (§2b's OAuth1 keys):
+
+| Action | Magento endpoint |
+|---|---|
+| `order/search` | `GET /V1/orders` (searchCriteria: sort `created_at` DESC, OR-filter over `increment_id`/`customer_email`/`customer_firstname`/`customer_lastname`, optional `status` eq filter, optional `created_at` date-range filters) |
+| `order/get` | `GET /V1/orders/{id}` + `GET /V1/shipments?...order_id eq {id}` (for tracking numbers) in parallel |
+| `order/cancel` / `order/hold` / `order/unhold` | `POST /V1/orders/{id}/cancel` \| `/hold` \| `/unhold` |
+
+**Why no `Kinex_OrderManagement` module, and why not GraphQL:** both were
+investigated first.
+
+- *GraphQL*: Magento 2.4.7-p3's Sales GraphQL schema (`module-sales-graph-ql`) has
+  no admin-wide order listing at all — `customerOrders`, `Customer.orders`,
+  `guestOrder(ByToken)` all resolve the order owner from the request's own
+  customer/guest identity, with no `customerId`/owner argument anywhere in the
+  schema, so there is no way to ask it for "every order in the store." No mutation
+  exists anywhere in core to change an order's status (`cancelOrder` is the same
+  customer-self-service cancellation, same identity scoping). `Magento_AdminGraphQlServer`
+  ("Commerce Admin BFF GraphQL Server") looks promising by name but its schema
+  (`ds_schema.graphqls`) is an empty scaffold (`commerce { config, version, catalog }`
+  with no fields on any of those types) — nothing in this install builds real Sales
+  schema on it.
+- *A generic "set arbitrary status" REST/custom endpoint*: traced into
+  `Magento\Sales\Model\Service\OrderService::addComment()` (backs the only
+  default REST route that looks like it might do this, `POST /V1/orders/{id}/comments`)
+  — it explicitly throws if the requested status differs from the order's current
+  status, so even core REST has no default "relabel the status" capability. The only
+  default mechanisms that actually change status are cancel/hold/unhold, which is
+  why the UI only exposes those three (buttons on the order detail dialog), not a
+  free-form status dropdown — deliberately avoiding "mark it however the UI wants"
+  in favor of "do only what Magento's own supported transitions allow."
+
+**Known simplifications** (same spirit as `ProductList`'s documented "Salable
+Quantity" shortcut):
+- **Payment Status** has no real Magento field — it's derived client-side from
+  `total_paid`/`total_due`/`total_refunded` (see `derivePaymentStatus` in
+  `actions-src/order/types/order.ts`): refunded > 0 → Refunded; paid > 0 and
+  due ≤ 0 → Paid; paid > 0 and due > 0 → Partially Paid; else Pending.
+- The **status filter dropdown** (`STATUS_FILTER_OPTIONS` in `OrderList.js`) is a
+  static list of Magento's default-install statuses, confirmed live against this
+  store. There is no default REST endpoint that lists all configured statuses
+  (`/V1/orders/:id/statuses` returns one order's *current* status, not the full
+  set) — a merchant-added custom status won't appear in the filter.
+
+---
+
+## 5b. Order Notifications — Adobe I/O Events + polling, no WebSocket
+
+`actions-src/order/events-consumer` + `actions-src/notifications/*` notify
+admins of new orders in near-real-time (≤15s) without a page refresh. Two
+architectural decisions here, both made explicitly rather than assumed:
+
+**Why polling, not a real WebSocket.** This app's entire backend is Adobe I/O
+Runtime actions — stateless, request/response, none can hold a connection open
+or push to a browser unprompted. A true WebSocket needs something that *can*
+hold that connection (either new self-hosted server infrastructure, or a
+managed pub/sub provider like Pusher/Ably — a new external account + API key +
+dependency). Given a choice between those and reusing this app's existing,
+proven pattern (`CommandManager.js` already polls a status endpoint every 2s),
+the latter was chosen: `AuthenticatedApp` in `App.js` polls
+`notifications/list` every 15s, for as long as the admin is logged in, on
+every page (not just Orders) via `useEffect`+`setInterval` at the top-level
+authenticated shell, and only toasts entries not seen on the previous poll.
+
+**Why Adobe I/O Events, not GraphQL/a new Magento module.** Mirrors the
+investigation in §5a. Magento's default REST has no order-created webhook, but
+this project already has a *live, working* Adobe I/O Events pipeline for
+products (`actions-src/product/events-consumer`, confirmed via
+`adobe_io_events/eventing/enabled: 1` in Magento's config and a real
+`provider_id` — not placeholders) — extending that existing mechanism to
+orders needed zero new Magento module code:
+```bash
+bin/magento events:subscribe observer.sales_order_place_after --priority \
+  --fields=entity_id --fields=increment_id --fields=customer_firstname \
+  --fields=customer_lastname --fields=customer_is_guest --fields=grand_total \
+  --fields=order_currency_code --fields=status --fields=created_at
+bin/magento setup:upgrade && bin/magento cache:flush
+```
+`sales_order_place_after` (confirmed via Magento core source,
+`Magento\Sales\Model\Order::place()`) fires exactly once per order, unlike
+`sales_order_save_after` which also fires on every later edit/invoice/status
+change — using it is what makes "avoid duplicate notifications" hold even
+before the consumer's own dedupe check. The `--fields` list is deliberately
+minimal: no email, no addresses, no payment data.
+
+The runtime-action binding (separate from the Magento-side subscribe above) is
+an Adobe I/O Events **registration**, not a repo file:
+```bash
+aio event registration create path/to/body.json
+# body.json: {"name": "orders", "delivery_type": "webhook",
+#   "runtime_action": "order/events-consumer",
+#   "events_of_interest": [{"provider_id": "<commerce provider id>",
+#     "event_code": "com.adobe.commerce.observer.sales_order_place_after"}]}
+```
+Get `<commerce provider id>` from `aio event registration list` (an existing
+registration, if any) or `aio event provider list`. The real event-code format
+is `com.adobe.commerce.observer.<exact magento event name>` — confirmed via
+`aio event eventmetadata list <providerId>`, not assumed. **This matters**:
+`EventCode.PRODUCT_SAVED`/`PRODUCT_DELETED` in
+`actions-src/utils/io-events/adobe-events-api.ts` do NOT match this format
+(they have an erroneous extra `_commit`) — a pre-existing bug predating this
+feature, left as-is since fixing it wasn't part of this task, but worth fixing
+separately since it means the product consumer silently no-ops on every real
+event it receives.
+
+**Three real, pre-existing operational gaps had to be fixed before any of this
+could deliver automatically** (none caused by this feature - all three also
+silently broke the pre-existing product-sync pipeline, which had never
+actually delivered a single event despite looking fully configured):
+
+1. **Magento's cron was never running on this machine.** `crontab -l` returned
+   nothing, and `event_data` showed every queued event - including months of
+   pre-existing product ones - stuck at `status=0` (queued, never sent).
+   Fixed with Magento's own `bin/magento cron:install` (generates the correct
+   crontab entry, including the right PHP binary path, automatically).
+2. **The event field-extraction plugin had never been generated.** Adobe's
+   `Magento\AdobeCommerceEventsClient\Event\Processor\EventProcessor` relies on
+   a *generated* plugin (`Magento\AdobeCommerceEvents\Plugin\Framework\ManagerInterfacePlugin`,
+   hooking `Event\ManagerInterface::afterDispatch`) that simply didn't exist in
+   `app/code/Magento/` on this install. Without it, events were queued and
+   "sent" (HTTP 200 from Adobe) but with an **empty payload** (`"value":{}`)
+   every time - confirmed directly via Adobe's event trace API
+   (`aio event registration get <id>` for the `rel:trace` URL, called with a
+   real S2S-generated bearer token - see the trace calls in this session's
+   history for the exact request shape). Fixed with
+   `bin/magento events:generate:module && bin/magento setup:di:compile`.
+3. **The field-path convention needed the dispatch array's key as a prefix.**
+   `sales_order_place_after` dispatches as `['order' => $this]`, so
+   `events:subscribe --fields=order.increment_id` (not bare `increment_id`) is
+   what actually populates data - and the resulting event payload is
+   correspondingly nested as `data.value.order.increment_id`, not
+   `data.value.increment_id`. Also confirmed only empirically, via the same
+   trace API: `entity_id` and `created_at` are never included in this specific
+   event's payload regardless of field selection, which is why the
+   `OrderNotification`/consumer code uses `increment_id` as the sole
+   identifier throughout (see `order/get`'s `incrementId` resolution param,
+   which looks up the real `entity_id` via a searchCriteria call when only an
+   increment_id is available, exactly the case for every order notification).
+
+All three fixed and the full pipeline confirmed **actually working
+automatically**, with zero manual `aio rt action invoke` calls: placed a real
+guest-checkout order, changed nothing else, and watched it appear in
+`notifications/list` on its own within a few minutes (cron runs every
+minute; Adobe's own delivery/retry adds some additional latency on top).
+
+Notification storage is Adobe I/O **State** (`loadNotifications`/
+`saveNotifications` in `actions-src/notifications/types/notification.ts`) —
+one JSON array under a single key, capped at 50, 30-day TTL. Simple and
+sufficient at this app's scale; a known limitation is a theoretical lost
+update if two orders' events are processed genuinely concurrently (read-
+modify-write on one key, no locking) — acceptable here, same spirit as the
+other documented simplifications in this file.
+
+---
+
+## 6. Quick checklist — setting this up on a new machine
 
 1. `aio app use` → picks the Adobe org/project/workspace, writes §1's block into
    `.env` automatically.
@@ -325,5 +638,13 @@ so no extra Magento-side permission grant was needed for these custom routes.
 4. Pick an existing Magento Admin login → put it into `COMMERCE_ADMIN_USERNAME` /
    `COMMERCE_ADMIN_PASSWORD` (§2c) — skip this if you don't need product-status
    All-Store-Views sync.
-5. `aio app deploy` → regenerates `web-src/src/config.json` (§3) and pushes
+5. Magento Admin → Stores → Configuration → General → Storefront Stock Widget →
+   fill in the ERP URL/key and allowed origin (§3) — skip this if you're not using
+   the storefront stock widget.
+6. Enable `Kinex_ZLF31QCAN`, run `setup:upgrade`, then immediately run
+   `bin/magento kinex:zlf31qcan:activate --all` (§5) before anyone tries to log
+   in — skip only if you're not using Admin User management.
+7. `aio app deploy` → regenerates `web-src/src/config.json` (§4) and pushes
    everything live.
+8. Open the app through the Experience Cloud Shell URL that `aio app deploy`
+   prints, not the bare static URL — every action requires an IMS token (§1a).

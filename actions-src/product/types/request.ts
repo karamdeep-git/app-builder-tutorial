@@ -8,7 +8,7 @@ export interface ProductSkuParams {
 
 export type ProductListParams = BaseParams;
 
-export type ProductGetParams = BaseParams & ProductSkuParams;
+export type ProductGetParams = BaseParams & CommerceParams & ProductSkuParams;
 
 export type ProductDeleteParams = BaseParams & CommerceParams & ProductSkuParams;
 
@@ -33,7 +33,7 @@ export type ProductEventParams = BaseParams & {
 };
 
 export interface ProductSearchQueryParams {
-  query: string;
+  query?: string;
   page?: number;
   pageSize?: number;
 }
@@ -41,3 +41,8 @@ export interface ProductSearchQueryParams {
 export type ProductSearchParams = BaseParams & CommerceParams & ProductSearchQueryParams;
 
 export type ProductCategoriesParams = BaseParams & CommerceParams;
+
+export type ProductImageParams = BaseParams & {
+  COMMERCE_BASE_URL: string;
+  path: string;
+};

@@ -6,7 +6,19 @@ list:
     LOG_LEVEL: debug
 
   annotations:
-    require-adobe-auth: false
+    require-adobe-auth: true
+    final: true
+
+image:
+  function: ../../actions/product/image/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+
+  annotations:
+    require-adobe-auth: true
     final: true
 
 get:
@@ -15,9 +27,14 @@ get:
   runtime: nodejs:20
   inputs:
     LOG_LEVEL: debug
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
 
   annotations:
-    require-adobe-auth: false
+    require-adobe-auth: true
     final: true
 
 update:
@@ -27,7 +44,6 @@ update:
   inputs:
     LOG_LEVEL: debug
     COMMERCE_BASE_URL: $COMMERCE_BASE_URL
-    COMMERCE_STORE_CODES: $COMMERCE_STORE_CODES
     COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
     COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
     COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
@@ -36,7 +52,7 @@ update:
     COMMERCE_ADMIN_PASSWORD: $COMMERCE_ADMIN_PASSWORD
 
   annotations:
-    require-adobe-auth: false
+    require-adobe-auth: true
     final: true
 
 delete:
@@ -46,16 +62,19 @@ delete:
   inputs:
     LOG_LEVEL: debug
     COMMERCE_BASE_URL: $COMMERCE_BASE_URL
-    COMMERCE_STORE_CODES: $COMMERCE_STORE_CODES
     COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
     COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
     COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
     COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
 
   annotations:
-    require-adobe-auth: false
+    require-adobe-auth: true
     final: true
 
+# Invoked by Adobe I/O Events, not the frontend. require-adobe-auth stays
+# false: it only applies to web actions (aio ignores it on non-web ones, with a
+# warning), and a non-web action has no public URL - it can only be invoked
+# with this namespace's own Runtime credentials.
 events-consumer:
   function: ../../actions/product/events-consumer/index.js
   web: "no"
@@ -74,14 +93,13 @@ search:
   inputs:
     LOG_LEVEL: debug
     COMMERCE_BASE_URL: $COMMERCE_BASE_URL
-    COMMERCE_STORE_CODES: $COMMERCE_STORE_CODES
     COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
     COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
     COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
     COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
 
   annotations:
-    require-adobe-auth: false
+    require-adobe-auth: true
     final: true
 
 categories:
@@ -91,12 +109,11 @@ categories:
   inputs:
     LOG_LEVEL: debug
     COMMERCE_BASE_URL: $COMMERCE_BASE_URL
-    COMMERCE_STORE_CODES: $COMMERCE_STORE_CODES
     COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
     COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
     COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
     COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
 
   annotations:
-    require-adobe-auth: false
+    require-adobe-auth: true
     final: true

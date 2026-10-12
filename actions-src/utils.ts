@@ -1,4 +1,3 @@
-import { StoreConfig } from "./types/commerce";
 import { BaseParams } from "./types/request";
 
 interface Logger {
@@ -134,49 +133,6 @@ function errorResponse(
       },
     },
   };
-}
-
-/**
- * Parse store codes configuration from environment variable
- * Supports format:
- * - [{"storeCode": "gb"}, {"storeCode": "pl", "storeUrl": "https://pl.example.com"}]
- *
- * @param storeCodesJson JSON string from COMMERCE_STORE_CODES environment variable
- * @returns Array of store configurations
- */
-export function parseStoreConfigs(storeCodesJson: string): StoreConfig[] {
-  try {
-    const parsed = JSON.parse(storeCodesJson);
-
-    if (!Array.isArray(parsed)) {
-      throw new Error("Store codes must be an array");
-    }
-
-    return parsed.map((config: unknown) => {
-      if (typeof config !== "object" || config === null) {
-        throw new Error("Each store config must be an object");
-      }
-
-      const storeConfig = config as Record<string, unknown>;
-
-      if (typeof storeConfig.storeCode !== "string") {
-        throw new Error("storeCode must be a string");
-      }
-
-      // Validate storeUrl if provided
-      const storeUrl = storeConfig.storeUrl;
-      if (storeUrl !== undefined && typeof storeUrl !== "string") {
-        throw new Error("storeUrl must be a string when provided");
-      }
-
-      return {
-        storeCode: storeConfig.storeCode,
-        storeUrl: storeUrl && storeUrl.trim() ? storeUrl.trim() : undefined,
-      };
-    });
-  } catch (error) {
-    throw new Error(`Failed to parse COMMERCE_STORE_CODES: ${error instanceof Error ? error.message : String(error)}`);
-  }
 }
 
 export { checkMissingRequestInputs, errorResponse, getBearerToken, stringParameters };

@@ -13,7 +13,6 @@ const baseParams: CommandsListParams = {
   COMMERCE_CONSUMER_SECRET: "secret",
   COMMERCE_ACCESS_TOKEN: "token",
   COMMERCE_ACCESS_TOKEN_SECRET: "token-secret",
-  COMMERCE_STORE_CODES: "[]",
 };
 
 describe("commands list action", () => {

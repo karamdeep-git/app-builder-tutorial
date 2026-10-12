@@ -1,0 +1,24 @@
+# The ONLY public web action in this app, deliberately. It's called from the
+# Luma storefront by anonymous shoppers' browsers, which have no Adobe IMS
+# token to send - require-adobe-auth: true would break the widget for every
+# shopper. Any secret the storefront JS could send instead would be readable
+# in page source, so it wouldn't be real authentication either. What keeps it
+# safe is its scope: read-only, one SKU's public stock level per call, the ERP
+# key never leaves the server, and CORS restricted to the configured origin.
+# Never add an admin/write operation to this package.
+stock:
+  function: ../../actions/storefront/stock/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
+
+  annotations:
+    require-adobe-auth: false
+    web-custom-options: true
+    final: true

@@ -23,9 +23,8 @@ rotates on restart — see `COMMERCE_BASE_URL` in `.env`, documented in
 
 ## 2. Admin login
 
-Custom login gate for the app itself (separate from Adobe's own IMS/Experience Cloud
-Shell auth, which this app does not currently require — `require-adobe-auth: false`
-on all actions).
+Custom login gate for the app itself, layered on top of Adobe's own IMS auth
+(`require-adobe-auth: true` on every admin web action — see `CONFIGURATION.md` §1a).
 
 - **`actions-src/auth/login`** — validates a username/password against Magento's own
   admin token endpoint (`POST /rest/V1/integration/admin/token`). Real Magento admin
@@ -34,9 +33,9 @@ on all actions).
   redirects to a dashboard landing page on success.
 - Session persisted in `sessionStorage` (cleared on tab close). The whole app (sidebar,
   all pages) is hidden until logged in.
-- **Scope note**: this only gates the *app's UI*. The underlying `product/*`,
-  `indexer/*`, `commands/*` actions remain open (`require-adobe-auth: false`) — see
-  §7.
+- **Scope note**: this login gates the *app's UI*; the actions themselves are
+  protected by the IMS validator (`require-adobe-auth: true`), so they can't be
+  called directly without a valid Adobe token for the org — see §7.
 
 ## 3. Product catalog
 
@@ -145,12 +144,14 @@ Same async-job architecture as Indexing, in a second custom module:
 
 ## 7. Known limitations / deliberately deferred
 
-- **`require-adobe-auth` is `false`** on every action (open/unauthenticated at the
-  Adobe I/O Runtime level). This was originally `true`, but Experience Cloud Shell
-  login/role-grant issues (`FORBIDDEN_BY_ROLE` for a non-Developer-role user) blocked
-  testing, and the explicit decision was made to revert to open rather than keep
-  troubleshooting. The custom admin login (§2) gates the *app UI* but not the actions
-  themselves.
+- **`require-adobe-auth` is `true`** on every admin web action (restored after an
+  earlier revert to `false`, when Experience Cloud Shell role-grant issues —
+  `FORBIDDEN_BY_ROLE` for a non-Developer-role user — blocked testing). The app must
+  now be opened through the Experience Cloud Shell, and that role issue, if it
+  recurs for a user, has to be fixed in Adobe Admin Console. The only public web
+  action is `storefront/stock` (anonymous storefront shoppers have no IMS token);
+  `test/security-config.test.ts` fails if any other web action loses the
+  annotation. Details in `CONFIGURATION.md` §1a.
 - **Store-view scoping for `name` and other store-view-scoped EAV attributes** (not
   `status`, which has the admin-session workaround) has no fix — Magento's REST API
   simply cannot write the "All Store Views" scope for these, and there's no

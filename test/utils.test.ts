@@ -5,7 +5,6 @@ test("interface", () => {
   expect(typeof utils.stringParameters).toBe("function");
   expect(typeof utils.checkMissingRequestInputs).toBe("function");
   expect(typeof utils.getBearerToken).toBe("function");
-  expect(typeof utils.parseStoreConfigs).toBe("function");
 });
 
 describe("errorResponse", () => {
@@ -118,60 +117,5 @@ describe("getBearerToken", () => {
     expect(utils.getBearerToken({ __ow_headers: { authorization: "Bearer fake Bearer fake" } })).toEqual(
       "fake Bearer fake"
     );
-  });
-});
-
-describe("parseStoreConfigs", () => {
-  test("should parse basic store configuration without storeUrl", () => {
-    const input = '[{"storeCode": "us"}]';
-    const result = utils.parseStoreConfigs(input);
-    expect(result).toEqual([{ storeCode: "us", storeUrl: undefined }]);
-  });
-
-  test("should parse store configuration with storeUrl", () => {
-    const input = '[{"storeCode": "pl", "storeUrl": "https://pl.mystore.com"}]';
-    const result = utils.parseStoreConfigs(input);
-    expect(result).toEqual([{ storeCode: "pl", storeUrl: "https://pl.mystore.com" }]);
-  });
-
-  test("should parse multiple stores with mixed storeUrl configuration", () => {
-    const input = '[{"storeCode": "us"}, {"storeCode": "pl", "storeUrl": "https://pl.mystore.com"}]';
-    const result = utils.parseStoreConfigs(input);
-    expect(result).toEqual([
-      { storeCode: "us", storeUrl: undefined },
-      { storeCode: "pl", storeUrl: "https://pl.mystore.com" },
-    ]);
-  });
-
-  test("should trim whitespace from storeUrl", () => {
-    const input = '[{"storeCode": "us", "storeUrl": "  https://us.mystore.com  "}]';
-    const result = utils.parseStoreConfigs(input);
-    expect(result).toEqual([{ storeCode: "us", storeUrl: "https://us.mystore.com" }]);
-  });
-
-  test("should handle empty storeUrl as undefined", () => {
-    const input = '[{"storeCode": "us", "storeUrl": ""}]';
-    const result = utils.parseStoreConfigs(input);
-    expect(result).toEqual([{ storeCode: "us", storeUrl: undefined }]);
-  });
-
-  test("should throw error when storeUrl is not a string", () => {
-    const input = '[{"storeCode": "us", "storeUrl": 123}]';
-    expect(() => utils.parseStoreConfigs(input)).toThrow("storeUrl must be a string when provided");
-  });
-
-  test("should throw error for invalid JSON", () => {
-    const input = "invalid json";
-    expect(() => utils.parseStoreConfigs(input)).toThrow("Failed to parse COMMERCE_STORE_CODES");
-  });
-
-  test("should throw error for non-array input", () => {
-    const input = '{"storeCode": "us"}';
-    expect(() => utils.parseStoreConfigs(input)).toThrow("Store codes must be an array");
-  });
-
-  test("should throw error when storeCode is missing", () => {
-    const input = "[{}]";
-    expect(() => utils.parseStoreConfigs(input)).toThrow("storeCode must be a string");
   });
 });

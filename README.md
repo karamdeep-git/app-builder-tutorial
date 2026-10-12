@@ -19,6 +19,9 @@ all driven from a single React + Adobe Spectrum UI and TypeScript backend action
   enable/disable) from the UI, sequentially, with live progress and history.
 - **Customers** — list, view, create, and delete customers.
 - **Login** — admin session login against Adobe Commerce, used to gate the app.
+- **Security** — every admin backend action requires a valid Adobe IMS token
+  (`require-adobe-auth: true`), so the app must be opened through the Experience
+  Cloud Shell. See [CONFIGURATION.md §1a](CONFIGURATION.md).
 
 The Indexing and Command Manager features require a small companion Magento
 module (`Kinex_Reindex` / `Kinex_CommandManager`) installed on the Commerce

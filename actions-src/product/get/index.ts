@@ -1,22 +1,28 @@
 import { initializeLogger, logError } from "../../logger";
 import { actionErrorResponse, successResponse } from "../../responses";
 import { AppResponse, HttpStatus } from "../../types/request";
-import { getStateClient } from "../../utils/lib-state/state-client";
-import { Product, productStateKey } from "../types/product";
+import { AdobeCommerceClient } from "../../utils/adobe-commerce/adobe-commerce-client";
+import { Product } from "../types/product";
 import { ProductGetParams } from "../types/request";
 
 export async function main(params: ProductGetParams): Promise<AppResponse> {
   initializeLogger("process-function");
 
   try {
-    const stateClient = await getStateClient();
-    const entry = await stateClient.get(productStateKey(params.sku));
-
-    if (!entry?.value) {
-      return actionErrorResponse(HttpStatus.NOT_FOUND, `Product '${params.sku}' not found`);
+    if (!params.sku) {
+      return actionErrorResponse(HttpStatus.BAD_REQUEST, "Missing sku");
     }
 
-    const product = JSON.parse(entry.value) as Product;
+    const client = AdobeCommerceClient.create(params, {
+      storeCode: "default",
+      storeUrl: params.COMMERCE_BASE_URL,
+    });
+
+    // Fetched live from Magento (not the State cache product/list reads from)
+    // since stock is the one field here that changes outside this app too -
+    // the Edit dialog needs the real current qty/is_in_stock, not a stale copy.
+    const product = await client.get<Product>(`/products/${encodeURIComponent(params.sku)}`);
+
     return successResponse("Product fetched", { product });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";

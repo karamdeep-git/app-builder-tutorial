@@ -7,5 +7,5 @@ login:
     COMMERCE_BASE_URL: $COMMERCE_BASE_URL
 
   annotations:
-    require-adobe-auth: false
+    require-adobe-auth: true
     final: true

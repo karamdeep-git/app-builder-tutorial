@@ -12,6 +12,8 @@ import {
   Item,
   CheckboxGroup,
   Checkbox,
+  ProgressCircle,
+  Text,
   View,
   ButtonGroup,
   Button,
@@ -20,6 +22,11 @@ import {
 const STATUS_OPTIONS = [
   { id: 1, name: "Enabled" },
   { id: 2, name: "Disabled" },
+];
+
+const STOCK_STATUS_OPTIONS = [
+  { id: "in_stock", name: "In Stock" },
+  { id: "out_of_stock", name: "Out of Stock" },
 ];
 
 function initialSelectedCategoryIds(product) {
@@ -39,6 +46,8 @@ const ProductEditDialog = ({ product, categories, onSave, onCancel, isSaving }) 
   const [name, setName] = useState(product?.name ?? "");
   const [price, setPrice] = useState(product?.price ?? 0);
   const [status, setStatus] = useState(product?.status ?? 1);
+  const [qty, setQty] = useState(product?.extension_attributes?.stock_item?.qty ?? 0);
+  const [isInStock, setIsInStock] = useState(product?.extension_attributes?.stock_item?.is_in_stock ?? false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState(() => initialSelectedCategoryIds(product));
 
   function handleSave() {
@@ -49,6 +58,10 @@ const ProductEditDialog = ({ product, categories, onSave, onCancel, isSaving }) 
       price,
       status,
       custom_attributes: buildCustomAttributesWithCategories(product, selectedCategoryIds),
+      extension_attributes: {
+        ...product?.extension_attributes,
+        stock_item: { ...product?.extension_attributes?.stock_item, qty: Number(qty), is_in_stock: isInStock },
+      },
     });
   }
 
@@ -83,14 +96,27 @@ const ProductEditDialog = ({ product, categories, onSave, onCancel, isSaving }) 
           >
             {(item) => <Item key={String(item.id)}>{item.name}</Item>}
           </Picker>
+          <Picker
+            label="Stock Status"
+            items={STOCK_STATUS_OPTIONS}
+            selectedKey={isInStock ? "in_stock" : "out_of_stock"}
+            onSelectionChange={(key) => setIsInStock(key === "in_stock")}
+          >
+            {(item) => <Item key={item.id}>{item.name}</Item>}
+          </Picker>
+          <NumberField label="Quantity" value={qty} onChange={setQty} minValue={0} />
           <View maxHeight="size-2400" overflow="auto">
-            <CheckboxGroup label="Categories" value={selectedCategoryIds} onChange={setSelectedCategoryIds}>
+            {categories.length === 0 ? (
+              <ProgressCircle size="S" aria-label="Loading categories" isIndeterminate />
+            ) : (
+              <CheckboxGroup label="Categories" value={selectedCategoryIds} onChange={setSelectedCategoryIds}>
               {categories.map((category) => (
                 <Checkbox key={category.id} value={String(category.id)}>
                   {"  ".repeat(category.level) + category.name}
                 </Checkbox>
               ))}
             </CheckboxGroup>
+            )}
           </View>
         </Form>
       </Content>
@@ -99,7 +125,14 @@ const ProductEditDialog = ({ product, categories, onSave, onCancel, isSaving }) 
           Cancel
         </Button>
         <Button variant="accent" onPress={handleSave} isDisabled={!sku || isSaving}>
-          Save
+          {isSaving ? (
+            <>
+              <ProgressCircle size="S" aria-label="Saving" isIndeterminate marginEnd="size-100" />
+              <Text>Saving...</Text>
+            </>
+          ) : (
+            <Text>Save</Text>
+          )}
         </Button>
       </ButtonGroup>
     </Dialog>

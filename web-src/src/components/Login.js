@@ -6,8 +6,13 @@ import allActions from "../config.json";
 import actionWebInvoke from "../utils";
 import kinexLogo from "url:../assets/kinex-logo.webp";
 
-function Login({ onLoginSuccess }) {
+function Login({ ims, onLoginSuccess }) {
   const navigate = useNavigate();
+
+  const authHeaders = {
+    ...(ims?.token ? { authorization: `Bearer ${ims.token}` } : {}),
+    ...(ims?.org ? { "x-gw-ims-org-id": ims.org } : {}),
+  };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
@@ -20,7 +25,7 @@ function Login({ onLoginSuccess }) {
     try {
       const result = await actionWebInvoke(
         allActions["auth/login"],
-        {},
+        authHeaders,
         { data: { username, password } },
         { method: "POST" }
       );
@@ -32,7 +37,17 @@ function Login({ onLoginSuccess }) {
       navigate("/dashboard");
       onLoginSuccess(result?.response?.username ?? username);
     } catch (err) {
-      setError(/status: 401/.test(err.message) ? "Invalid username or password" : "Login failed. Please try again.");
+      // A 401 can come from two layers: auth/login itself (wrong Magento
+      // credentials - its body says so) or the Adobe IMS validator in front of
+      // every action (missing/expired/wrong-org token), which is never the
+      // user's password's fault.
+      if (/Invalid username or password/.test(err.message)) {
+        setError("Invalid username or password");
+      } else if (/status: (401|403)/.test(err.message)) {
+        setError("Your Adobe session couldn't be verified. Reload the app from Experience Cloud and try again.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
       setIsSubmitting(false);
     }
   }
@@ -40,7 +55,15 @@ function Login({ onLoginSuccess }) {
   return (
     <Flex direction="column" alignItems="center" justifyContent="center" height="100vh" gap="size-300">
       <img src={kinexLogo} alt="Kinex Media" style={{ height: "40px", width: "auto" }} />
-      <View width="size-4600" padding="size-300" borderWidth="thin" borderColor="dark" borderRadius="medium">
+      <View
+        width="100%"
+        maxWidth="size-4600"
+        marginX="size-200"
+        padding="size-300"
+        borderWidth="thin"
+        borderColor="dark"
+        borderRadius="medium"
+      >
         <Heading level={2}>Admin Login</Heading>
         <Form onSubmit={handleSubmit}>
           <TextField label="Username" value={username} onChange={setUsername} isRequired autoFocus />
@@ -60,6 +83,7 @@ function Login({ onLoginSuccess }) {
 }
 
 Login.propTypes = {
+  ims: PropTypes.any,
   onLoginSuccess: PropTypes.func.isRequired,
 };
 

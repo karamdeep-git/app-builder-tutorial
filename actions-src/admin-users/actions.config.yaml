@@ -1,0 +1,47 @@
+list:
+  function: ../../actions/admin-users/list/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
+
+  annotations:
+    require-adobe-auth: true
+    final: true
+
+activate:
+  function: ../../actions/admin-users/activate/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
+
+  annotations:
+    require-adobe-auth: true
+    final: true
+
+deactivate:
+  function: ../../actions/admin-users/deactivate/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: debug
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
+
+  annotations:
+    require-adobe-auth: true
+    final: true

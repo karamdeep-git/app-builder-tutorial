@@ -6,7 +6,7 @@ create:
     LOG_LEVEL: debug
 
   annotations:
-    require-adobe-auth: false
+    require-adobe-auth: true
     final: true
 
 get:
@@ -17,7 +17,7 @@ get:
     LOG_LEVEL: debug
 
   annotations:
-    require-adobe-auth: false
+    require-adobe-auth: true
     final: true
 
 list:
@@ -28,7 +28,7 @@ list:
     LOG_LEVEL: debug
 
   annotations:
-    require-adobe-auth: false
+    require-adobe-auth: true
     final: true
 
 delete:
@@ -39,5 +39,5 @@ delete:
     LOG_LEVEL: debug
 
   annotations:
-    require-adobe-auth: false
+    require-adobe-auth: true
     final: true

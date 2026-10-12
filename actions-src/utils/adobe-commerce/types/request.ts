@@ -4,5 +4,4 @@ export interface CommerceParams {
     COMMERCE_CONSUMER_SECRET: string;
     COMMERCE_ACCESS_TOKEN: string;
     COMMERCE_ACCESS_TOKEN_SECRET: string;
-    COMMERCE_STORE_CODES: string;
 }

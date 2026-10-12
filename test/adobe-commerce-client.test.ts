@@ -110,7 +110,6 @@ describe("AdobeCommerceClient", () => {
       COMMERCE_CONSUMER_SECRET: "test-secret",
       COMMERCE_ACCESS_TOKEN: "test-token",
       COMMERCE_ACCESS_TOKEN_SECRET: "test-token-secret",
-      COMMERCE_STORE_CODES: "[]",
     };
 
     const mockAdobeImsParams: AdobeImsParams = {

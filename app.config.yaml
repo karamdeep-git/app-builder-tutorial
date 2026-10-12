@@ -33,6 +33,26 @@ application:
         actions:
           $include: ./actions-src/category/actions.config.yaml
 
+      order:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/order/actions.config.yaml
+
+      notifications:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/notifications/actions.config.yaml
+
+      storefront:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/storefront/actions.config.yaml
+
+      admin-users:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/admin-users/actions.config.yaml
+
 productDependencies:
   - code: COMMC
     minVersion: 2.4.4

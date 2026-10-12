@@ -10,6 +10,16 @@ import { getProviderName } from "./naming";
 export enum EventCode {
   PRODUCT_SAVED = "com.adobe.commerce.observer.catalog_product_save_commit_after",
   PRODUCT_DELETED = "com.adobe.commerce.observer.catalog_product_delete_commit_after",
+  // Confirmed directly against this project's live Adobe I/O Events provider
+  // (`aio event eventmetadata list <providerId>`): the real format is
+  // "com.adobe.commerce.observer.<exact magento event name>" - e.g. Magento's
+  // `observer.catalog_product_save_after` becomes
+  // "com.adobe.commerce.observer.catalog_product_save_after" once registered.
+  // PRODUCT_SAVED above does NOT match this - it has an extra "_commit" that
+  // doesn't exist in the real event metadata list, a pre-existing mismatch
+  // predating this change, not introduced here. Verify a new event type
+  // against the live metadata list the same way before trusting this pattern.
+  ORDER_PLACED = "com.adobe.commerce.observer.sales_order_place_after",
 }
 
 export enum ProviderKey {

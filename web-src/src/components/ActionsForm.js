@@ -40,7 +40,7 @@ const ActionsForm = (props) => {
   });
 
   return (
-    <View width="size-6000">
+    <View width="100%" maxWidth="size-6000">
       <Heading level={1}>Run your application backend actions</Heading>
       {Object.keys(actions).length > 0 && (
         <Form necessityIndicator="label">

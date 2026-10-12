@@ -180,7 +180,7 @@ function CommandManager({ ims, currentUser }) {
   const isRunning = job?.status === "running" || isStarting;
 
   return (
-    <View width="size-6000">
+    <View width="100%" maxWidth="size-6000">
       <Heading level={1}>Magento Command Manager</Heading>
 
       {error && (

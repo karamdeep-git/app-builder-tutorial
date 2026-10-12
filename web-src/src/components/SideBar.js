@@ -27,6 +27,15 @@ function SideBar() {
         <NavLink
           className={({ isActive }) => `SideNav-itemLink ${isActive ? "is-selected" : ""}`}
           aria-current="page"
+          to="/orders"
+        >
+          Orders
+        </NavLink>
+      </li>
+      <li className="SideNav-item">
+        <NavLink
+          className={({ isActive }) => `SideNav-itemLink ${isActive ? "is-selected" : ""}`}
+          aria-current="page"
           to="/categories"
         >
           Categories
@@ -48,6 +57,15 @@ function SideBar() {
           to="/commands"
         >
           Command Manager
+        </NavLink>
+      </li>
+      <li className="SideNav-item">
+        <NavLink
+          className={({ isActive }) => `SideNav-itemLink ${isActive ? "is-selected" : ""}`}
+          aria-current="page"
+          to="/admin-users"
+        >
+          Admin Users
         </NavLink>
       </li>
       <li className="SideNav-item">

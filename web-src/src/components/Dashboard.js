@@ -31,7 +31,7 @@ function Dashboard({ username, ims }) {
   }, [ims?.token]);
 
   return (
-    <View width="size-6000">
+    <View width="100%" maxWidth="size-6000">
       <Heading level={1}>Dashboard</Heading>
       <Text>Welcome back, {username}.</Text>
 
@@ -41,7 +41,7 @@ function Dashboard({ username, ims }) {
         </View>
       )}
 
-      <Flex direction="row" gap="size-300" marginTop="size-300">
+      <Flex direction="row" gap="size-300" marginTop="size-300" wrap="wrap">
         <View borderWidth="thin" borderColor="dark" borderRadius="medium" padding="size-300" width="size-2400">
           <Heading level={3} marginTop="size-0">
             Cached products

@@ -157,7 +157,7 @@ function Indexing({ ims }) {
   const isRunning = job?.status === "running";
 
   return (
-    <View width="size-8000">
+    <View width="100%" maxWidth="size-8000">
       <Flex direction="row" justifyContent="space-between" alignItems="center" marginBottom="size-200">
         <Heading level={1}>Indexing</Heading>
         <Button variant="secondary" onPress={() => startReindex([])} isDisabled={isRunning}>

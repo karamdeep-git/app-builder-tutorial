@@ -1,6 +1,7 @@
 export interface BaseParams {
   __ow_headers?: Record<string, string>;
   __ow_body?: string;
+  __ow_method?: string;
   LOG_LEVEL?: string;
   [key: string]: unknown;
 }
@@ -39,4 +40,5 @@ export enum HttpStatus {
 export interface AppResponse {
   statusCode: HttpStatus;
   body: unknown;
+  headers?: Record<string, string>;
 }

@@ -3,6 +3,23 @@ body {
   margin: 0;
 }
 
+/** Responsive app shell: stack the sidebar above the content below 700px
+    instead of keeping a fixed 256px sidebar that crowds out narrow viewports.
+    Spectrum's Grid sets grid-template-columns/areas as inline styles, so this
+    needs !important to actually override them at this breakpoint. **/
+@media (max-width: 700px) {
+  .app-shell {
+    grid-template-columns: 1fr !important;
+    grid-template-areas: "sidebar" "content" !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+
+  .app-shell-sidebar {
+    max-height: 40vh;
+  }
+}
+
 /** Custom Sidebar Styling **/
 .SideNav {
   list-style-type: none;
@@ -41,4 +58,195 @@ body {
 .SideNav-itemLink.is-selected {
   color: var(--spectrum-alias-text-color-hover,var(--spectrum-global-color-gray-900));
   background-color: var(--spectrum-alias-highlight-hover);
+}
+
+/** Magento Admin-style product grid. A plain table with hand-rolled styling,
+    not a Spectrum TableView - matching Magento's own dark-header grid means
+    full control over colors/borders/density that Spectrum's internal
+    (unstable, undocumented) class names aren't meant to be overridden via. **/
+.admin-grid-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #fafafa;
+  border: 1px solid #d1d1d1;
+  border-bottom: none;
+  border-radius: 2px 2px 0 0;
+  font-size: 13px;
+}
+
+.admin-grid-toolbar select {
+  font-size: 13px;
+  padding: 4px 6px;
+  border: 1px solid #c2c2c2;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.admin-grid-toolbar button.admin-grid-arrow {
+  border: 1px solid #c2c2c2;
+  background: #fff;
+  border-radius: 2px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.admin-grid-toolbar button.admin-grid-arrow:disabled {
+  color: #c2c2c2;
+  cursor: not-allowed;
+}
+
+.admin-grid-wrapper {
+  overflow-x: auto;
+  border: 1px solid #d1d1d1;
+  border-radius: 0 0 2px 2px;
+}
+
+.admin-grid {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 1280px;
+  font-size: 13px;
+  background: #fff;
+}
+
+.admin-grid thead th {
+  background: #333333;
+  color: #fff;
+  text-align: left;
+  font-weight: 600;
+  padding: 10px 12px;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+
+.admin-grid tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e3e3e3;
+  vertical-align: middle;
+  color: #303030;
+  white-space: nowrap;
+}
+
+.admin-grid tbody tr:hover {
+  background: #f5f7fa;
+}
+
+.admin-grid tbody tr.is-selected {
+  background: #e4f1ff;
+}
+
+.admin-grid-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border: 1px solid #d1d1d1;
+  border-radius: 2px;
+  display: block;
+}
+
+.admin-grid-thumb-placeholder {
+  width: 40px;
+  height: 40px;
+  background: #f0f0f0;
+  border: 1px solid #d1d1d1;
+  border-radius: 2px;
+}
+
+.admin-grid-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-grid-status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+
+.admin-grid-status.is-positive::before {
+  background: #79a22e;
+}
+
+.admin-grid-status.is-negative::before {
+  background: #e22626;
+}
+
+.admin-grid-status.is-neutral::before {
+  background: #9b9b9b;
+}
+
+.admin-grid-status.is-warning::before {
+  background: #f28b3a;
+}
+
+.admin-grid-filterbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: #fafafa;
+  border: 1px solid #d1d1d1;
+  border-radius: 2px;
+  font-size: 13px;
+}
+
+.admin-grid-filterbar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-grid-filterbar select,
+.admin-grid-filterbar input[type="date"] {
+  font-size: 13px;
+  padding: 4px 6px;
+  border: 1px solid #c2c2c2;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.admin-grid-row-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.admin-grid-row-actions button {
+  background: none;
+  border: none;
+  color: #1979c3;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.admin-grid-row-actions button.is-destructive {
+  color: #e22626;
+}
+
+.notification-row {
+  padding: 8px 2px;
+  border-bottom: 1px solid #e3e3e3;
+  cursor: pointer;
+}
+
+.notification-row:last-child {
+  border-bottom: none;
+}
+
+.notification-row:hover {
+  background: #f0f0f0 !important;
 }

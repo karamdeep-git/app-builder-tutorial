@@ -183,7 +183,7 @@ function CategoryManager({ ims }) {
   }
 
   return (
-    <View width="size-7000">
+    <View width="100%" maxWidth="size-7000">
       <Flex direction="row" justifyContent="space-between" alignItems="center" marginBottom="size-200">
         <Heading level={1}>Categories</Heading>
         <ActionButton onPress={() => setEditingCategory({ parentId: categories[0]?.id })}>
