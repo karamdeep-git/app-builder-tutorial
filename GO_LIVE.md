@@ -3,7 +3,6 @@
 What's needed to move Magento Catalog Manager from the **Stage** workspace (talking to
 the local `testapp` Magento through ngrok) to **Production** (talking to the real store).
 Items marked ✅ are already done in this repo.
-
 ## 1. Code (this repo)
 
 - ✅ Every admin web action requires an Adobe IMS token (`require-adobe-auth: true`),
