@@ -114,7 +114,13 @@ x-gw-ims-org-id: <the IMS org that token was issued for>
 
 Anything else is rejected by the validator before our action even runs. The
 Magento admin login (`auth/login`) is now a *second* layer on top of this, not the
-only gate.
+only gate. It checks the username and password with Magento's own
+`POST /V1/integration/admin/token`, so it's Magento's real admin users, its lockout
+after failed attempts, and its Active / Inactive flag. Magento returning a token is
+the proof; **the token itself never leaves the action**, because it's a full admin API
+key and the app only needs the username. The browser keeps "logged in" in
+`sessionStorage`, and the backend actions are protected by the IMS validator above,
+not by this login.
 
 **Where the token comes from:** only the Experience Cloud Shell gives the SPA an
 IMS token (`web-src/src/index.js` → `bootstrapInExcShell`). Every component already
@@ -577,6 +583,32 @@ is `com.adobe.commerce.observer.<exact magento event name>` — confirmed via
 feature, left as-is since fixing it wasn't part of this task, but worth fixing
 separately since it means the product consumer silently no-ops on every real
 event it receives.
+
+**Journaling endpoint (pull) vs runtime action (push).** Developer Console shows a
+"Journaling unique API endpoint" on every event registration, for example:
+
+```text
+https://events-va6.adobe.io/events/organizations/4033606/integrations/1037167/<registration-id>
+#                         org (= namespace number) ┘   workspace credential ┘   which registration ┘
+```
+
+This app uses **push**: Adobe calls `order/events-consumer` for each event. Separately,
+Adobe keeps every event for that registration in a journal for **7 days**, and this URL
+lets you **pull** it in order. Every registration gets one; the app doesn't use it.
+It's useful for debugging ("did Magento really send that order event?"), for catching
+up on events missed while the consumer was down, or for batch processing instead of
+push.
+
+```bash
+curl -H "Authorization: Bearer <IMS token for the workspace credential>" \
+     -H "x-api-key: <workspace client id>" \
+     "<journaling url>"            # add ?latest=true to start from the newest event
+# 200 -> a batch of events; 204 -> nothing newer. Follow the response's
+# `Link: <...>; rel="next"` header to keep reading forward.
+```
+
+The URL alone grants nothing (it needs a valid token for your org), but keep it
+internal.
 
 **Three real, pre-existing operational gaps had to be fixed before any of this
 could deliver automatically** (none caused by this feature - all three also

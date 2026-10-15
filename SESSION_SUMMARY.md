@@ -136,6 +136,64 @@ Also found and fixed while testing the Customers page: 17 of 18 Magento caches o
 Magento's config from scratch. Requests took 15–33s and the machine load was ~53.
 `bin/magento cache:enable` brought requests to ~0.05s.
 
+## 5c. Orders and notifications (`OrderList.js`, `NotificationBell.js`)
+
+- **Orders:** search (order #, name, email), status and date filters, a detail
+  dialog with addresses, items, totals and tracking, and cancel / hold / release
+  buttons. All of it uses Magento's default REST (`GET /V1/orders`,
+  `POST /V1/orders/{id}/cancel|hold|unhold`). There's no free-form status change,
+  because Magento has no default way to do one. Details in `CONFIGURATION.md` §5a.
+- **New-order notifications:** Magento's `sales_order_place_after` event goes through
+  Adobe I/O Events to the non-web `order/events-consumer`, which stores the
+  notification in Adobe I/O State. The app polls every 15s and toasts new arrivals
+  with a chime. Getting events to actually flow needed three Magento-side fixes:
+  cron wasn't installed, the event plugin was never generated, and the field paths
+  needed an `order.` prefix. Details in `CONFIGURATION.md` §5b, including what the
+  registration's **journaling endpoint** is for.
+
+## 5d. Admin Users (`AdminUserManager.js`, `Kinex_ZLF31QCAN`)
+
+Activate and deactivate Magento admin users using **Magento's own
+`admin_user.is_active` flag**, the same "This account is Active / Inactive" setting as
+System → Permissions → All Users. Magento has no REST API for admin users at all
+(`Magento_User` ships no `webapi.xml`), so `Kinex_ZLF31QCAN` is only that missing API:
+
+- Earlier versions kept a second status in their own `zlf31qcan` table, plus a login
+  observer that required both. That was replaced: a one-time data patch moved anyone
+  the old status was blocking to native `is_active = 0`, so nobody regained access.
+  The old table is left in place, unused.
+- Deactivating also revokes the user's existing admin API tokens, since Magento only
+  checks `is_active` when issuing a new one. The API refuses to deactivate the last
+  active admin.
+- Verified live: last-admin refusal (400), activate/deactivate round trip, unknown id
+  (404).
+
+## 5e. Dashboard (`Dashboard.js`, `actions-src/dashboard/stats`)
+
+A hero figure for **today's sales** (store timezone, base currency, canceled orders
+excluded) with today's order count, plus tiles for total orders, customers,
+**enabled products** (replacing the old "Cached products" count, which came from this
+app's own cache) and active admins. One action loads every section in parallel, and
+each section fails on its own with its reason. Details in `CONFIGURATION.md` §5e.
+
+## 5f. Security hardening and error handling
+
+- **`require-adobe-auth: true`** on every admin web action, enforced by
+  `test/security-config.test.ts`. See `CONFIGURATION.md` §1a.
+- **Login** no longer sends Magento's admin token to the browser. Magento issuing it
+  proves the password is right; the app only needs the username.
+- **`product/image`**: `..` path traversal blocked (its old pattern allowed it), and
+  responses marked `Cache-Control: private`.
+- **Errors:** every web action uses the shared `commerceErrorResponse`
+  (400/404/429/502/504 with a clear message) instead of `500 Request failed: <raw
+  internal error>`, and every page shows that message via `describeError()`. The
+  public `storefront/stock` only ever answers "Stock information is unavailable".
+- **Customer data in logs:** customer actions log at `info`, and URLs with search
+  terms, plus Magento error bodies, only appear at `debug`.
+- **`index.html` is served `no-cache`** (`web.response-headers` in
+  `app.config.yaml`), so a deploy is picked up on the next page load.
+- **Template pages removed:** Home, About and "Your App Actions" are gone.
+
 ## 6. Real bugs found and fixed along the way
 
 - **Login payload shape mismatch** — frontend sent a flat `{username, password}`
@@ -173,6 +231,25 @@ Magento's config from scratch. Requests took 15–33s and the machine load was ~
   interceptor class, causing the *entire* Magento CLI command list to silently
   collapse to a handful of core commands. Fixed by clearing `generated/code/Kinex`
   and re-running `setup:upgrade`.
+- **Duplicate low-stock alerts** — the alarms trigger fires right after every deploy,
+  and a manual run started one second later. Both read the "already alerted" list
+  before either saved it. Adobe I/O State has no compare-and-set, so the job now skips
+  an identical alert from the last 60s, and `loadNotifications()` collapses duplicates
+  on every read.
+- **Old app still showing after a deploy** — `index.html` had no `Cache-Control`, so
+  Chrome reused an old copy for hours, and that copy loaded the old JS bundle. Fixed
+  with `web.response-headers` (`no-cache` for `*.html`).
+- **"Failed to load page" / "No Apps available" in Experience Cloud** — after loading,
+  Experience Cloud shortens the address and drops `localDevUrl=`. Reloading or
+  bookmarking that shortened address loses the app. Always open the full link.
+- **Catalog Search reindex: "No alive nodes found in your cluster"** — Magento's engine
+  was locked to `elasticsearch7` on port 9250 in `app/etc/config.php`, and nothing
+  runs there. Homebrew OpenSearch runs on 9200, so the engine is now overridden in
+  `env.php` (`config:set --lock-env catalog/search/engine opensearch`).
+- **Slow deploys** — on some days Adobe I/O Runtime accepted action uploads at 20–50s
+  each instead of about 5s, making a deploy take about 25 minutes. Not caused by the
+  code (bundle sizes unchanged); the deploy only looks frozen because its output is
+  buffered.
 
 ## 7. Known limitations / deliberately deferred
 
@@ -192,6 +269,20 @@ Magento's config from scratch. Requests took 15–33s and the machine load was ~
   behavior** (the admin-session mechanism for status, and nothing — reindex/commands
   use real APIs on a module we own, so those are stable). The admin-session approach
   specifically could break on a Magento upgrade since it's not a public API.
+- **Product events are silently ignored** — `EventCode.PRODUCT_SAVED`/`PRODUCT_DELETED`
+  in `actions-src/utils/io-events/adobe-events-api.ts` carry an erroneous `_commit`, so
+  `product/events-consumer` no-ops on every real event. This predates this work, is
+  documented in `CONFIGURATION.md` §5b and listed in `GO_LIVE.md`.
+- **Notifications share one Adobe I/O State key** — a read-modify-write with no
+  locking, so two writers at the same instant can lose an update. Duplicates are
+  handled; a lost update is accepted at this scale.
+- **Dashboard "today"** uses the store timezone's offset at the moment of the request,
+  so on DST-change days it can start an hour early or late. Today's sales are summed
+  over at most 3,000 orders (`partial: true` past that).
+- **Unused `zlf31qcan` table** — left in the database on purpose (dropping it deletes
+  data); safe to remove in a later cleanup.
+- **OpenSearch 3.7 vs Magento 2.4.7** — Magento officially supports OpenSearch 2.x.
+  Indexing and search work, but if storefront search misbehaves, install 2.x.
 - A separate, unrelated side task this session: installed a fresh Magento 2.4.8-p5
   codebase at `/Users/kinex/Sites/magento248p7` (no DB setup or `setup:install` was
   run — just the Composer install).
@@ -200,12 +291,20 @@ Magento's config from scratch. Requests took 15–33s and the machine load was ~
 
 | Area | Path |
 |---|---|
-| App Builder actions | `actions-src/{auth,product,indexer,commands}/` |
+| App Builder actions | `actions-src/{auth,dashboard,product,order,notifications,customer,category,indexer,commands,admin-users,inventory,storefront}/` |
+| Shared Commerce error mapping | `actions-src/utils/adobe-commerce/errors.ts` (`commerceErrorResponse`, `describeCommerceError`) |
+| Shared searchCriteria builder | `actions-src/utils/adobe-commerce/search-criteria.ts` |
 | Status-sync admin-session client | `actions-src/utils/adobe-commerce/admin-session-client.ts` |
-| Frontend pages | `web-src/src/components/{Login,Dashboard,ProductList,ProductEditDialog,ProductSearchResults,Indexing,CommandManager}.js` |
+| Frontend pages | `web-src/src/components/{Login,Dashboard,ProductList,OrderList,CustomerManager,CategoryManager,Indexing,CommandManager,AdminUserManager}.js` |
+| Frontend error text | `web-src/src/utils.js` (`describeError`) |
+| Schedule (alarms trigger + rule) | `app.config.yaml` → `inventory` package |
 | Magento module: reindexing | `testapp/app/code/Kinex/Reindex/` |
 | Magento module: CLI commands | `testapp/app/code/Kinex/CommandManager/` |
-| Tests | `test/*.test.ts` (345 passing) |
+| Magento module: storefront stock config | `testapp/app/code/Kinex/StorefrontStock/` |
+| Magento module: admin users API | `testapp/app/code/Kinex/ZLF31QCAN/` |
+| Security regression test | `test/security-config.test.ts` |
+| Tests | `test/*.test.ts` (47 suites, 382 passing) |
+| Going to production | `GO_LIVE.md` |
 
 ---
 

@@ -21,7 +21,10 @@ use `aio <command>` anywhere.
 | `aio app deploy --web-assets` | Deploy only the frontend, skip redeploying actions (faster when only `web-src/` changed) |
 | `aio app logs` | Tail/fetch logs from deployed actions |
 | `aio runtime action invoke <name> --result` | Manually call one deployed action directly, bypassing the frontend — the main tool for debugging a single action |
+| `aio rt action invoke <pkg>/__secured_<name> --result` | Same, for an action behind `require-adobe-auth` (see below) |
+| `aio rt action invoke inventory/low-stock-check --result` | Run the scheduled low-stock check now instead of waiting for the hour (demo) |
 | `aio runtime activation list` | See recent invocations of your actions (debugging) |
+| `aio rt trigger list` / `aio rt rule list` | Confirm the hourly low-stock schedule is `active` |
 | `aio runtime activation logs <id>` | Full logs for one specific invocation |
 | `aio login` | Re-authenticate the CLI itself when a session expires |
 | `aio console where` | "What org/project/workspace am I currently pointed at?" — sanity check before deploying |
@@ -151,6 +154,22 @@ aio runtime action invoke product/update --param-file payload.json --result
 aio runtime action invoke indexer/reindex-status -p jobId "abc123" --result
 ```
 
+**Actions behind `require-adobe-auth: true` (every admin action here).** On deploy,
+`order/search` becomes a *sequence* (Adobe's IMS validator → your code), and your
+code is renamed `order/__secured_search`. Invoking `order/search` from the CLI fails
+the IMS check. Invoke the `__secured_` action instead: the CLI authenticates with your
+namespace key, so no IMS token is needed.
+
+```bash
+aio rt action invoke dashboard/__secured_stats --result
+aio rt action invoke admin-users/__secured_deactivate -p userIds "[3]" --result
+aio rt action invoke auth/__secured_login -p data '{"username":"x","password":"y"}' --result
+```
+
+Non-web actions (`inventory/low-stock-check`, the two `events-consumer`s) aren't
+wrapped and are invoked by their plain names. Note `aio rt action list --limit` maxes
+out at 50.
+
 ### `aio runtime activation` subcommands
 
 ```text
@@ -227,9 +246,19 @@ aio event eventmetadata     Manage the event types a Provider can emit
 
 ```bash
 aio event registration list     # see what this Workspace is currently subscribed to
-aio event registration get <id> # details of one registration (which events, which action it delivers to)
+aio event registration get <id> # details of one registration (which events, which action
+                                # it delivers to, and its journaling URL)
 aio event registration create   # wire up a new provider+event-type -> action binding (interactive)
 ```
+
+The order notifications (`order/events-consumer`) use this same mechanism. Each
+registration also has a **journaling URL**, from which you can pull its last 7 days of
+events. That's handy to check whether Magento really sent an event; see
+`CONFIGURATION.md` §5b.
+
+**Slow deploys:** some days Adobe I/O Runtime takes 20–50s per action upload, so
+`aio app deploy` can take about 25 minutes. If it looks frozen at "Deploying actions",
+check progress with `aio rt action list --limit 50`: the update times keep advancing.
 
 ---
 
