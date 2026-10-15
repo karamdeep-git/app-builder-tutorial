@@ -47,4 +47,29 @@ async function actionWebInvoke(actionUrl, headers = {}, params = {}, options = {
   return content;
 }
 
+/**
+ * Human-readable reason for a failed actionWebInvoke call.
+ *
+ * actionWebInvoke throws "failed request to '<url>' with status: N and
+ * message: <body>". Every action answers failures with
+ * {success: false, error: "..."} (see actions-src/utils/adobe-commerce/errors.ts),
+ * and the Adobe IMS validator with {error: "..."} - show that reason (e.g.
+ * Magento's "You can't cancel this order.") instead of the raw URL and status.
+ *
+ * @param {Error} e the error thrown by actionWebInvoke
+ * @returns {string} the message to show the admin
+ */
+export function describeError(e) {
+  const match = /and message: ([\s\S]*)$/.exec(e?.message ?? "");
+  if (match) {
+    try {
+      const body = JSON.parse(match[1]);
+      if (typeof body?.error === "string") return body.error;
+    } catch (parseError) {
+      // not JSON - fall through to the raw message
+    }
+  }
+  return e?.message ?? "Something went wrong.";
+}
+
 export default actionWebInvoke;

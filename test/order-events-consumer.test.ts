@@ -97,6 +97,18 @@ describe("order events-consumer action", () => {
     expect(result.body).toMatchObject({ response: { message: expect.stringContaining("Duplicate") } });
   });
 
+  it("tags new notifications as type 'order' and isn't confused by low-stock notifications in the list", async () => {
+    const lowStock = { id: "low-stock-1", type: "low_stock", products: [], totalCount: 1, threshold: 5, createdAt: "x", read: false };
+    mockStateClient.get.mockResolvedValue({ value: JSON.stringify([lowStock]), expiration: "" });
+
+    await main({ type: EventCode.ORDER_PLACED, data: { value: orderValue } });
+
+    const [, savedJson] = mockStateClient.put.mock.calls[0];
+    const saved = JSON.parse(savedJson);
+    expect(saved[0]).toMatchObject({ type: "order", incrementId: "000000007" });
+    expect(saved[1]).toEqual(lowStock);
+  });
+
   it("ignores unrecognized event types without touching state", async () => {
     const result = await main({ type: "some.other.event", data: { value: orderValue } });
 

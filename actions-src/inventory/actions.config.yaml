@@ -1,0 +1,24 @@
+# Scheduled, not called by the browser: web: "no" means there is no public URL
+# at all. It's run by the low-stock-every-hour trigger/rule declared on this
+# package in app.config.yaml, or manually for a demo with:
+#   aio rt action invoke inventory/low-stock-check --result
+# require-adobe-auth stays false: it only applies to web actions (aio ignores
+# it on non-web ones, with a warning), and a non-web action can only be
+# invoked with this namespace's own Runtime credentials.
+low-stock-check:
+  function: ../../actions/inventory/low-stock-check/index.js
+  web: "no"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: info
+    # Alert when a product's quantity is at or below this.
+    LOW_STOCK_THRESHOLD: 5
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
+
+  annotations:
+    require-adobe-auth: false
+    final: true

@@ -17,7 +17,7 @@ import PropTypes from "prop-types";
 import Add from "@spectrum-icons/workflow/Add";
 
 import allActions from "../config.json";
-import actionWebInvoke from "../utils";
+import actionWebInvoke, { describeError } from "../utils";
 import ProductEditDialog from "./ProductEditDialog";
 
 const actions = Object.keys(allActions).reduce((obj, key) => {
@@ -151,7 +151,7 @@ function ProductList({ ims }) {
           setTotalCount(result?.response?.totalCount ?? 0);
         }
       } catch (e) {
-        if (!cancelled) setError(e.message);
+        if (!cancelled) setError(describeError(e));
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -167,7 +167,7 @@ function ProductList({ ims }) {
     if (!actions["product/categories"]) return;
     actionWebInvoke(actions["product/categories"], authHeaders, {}, { method: "GET" })
       .then((result) => setCategories(result?.response?.categories ?? []))
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(describeError(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ims?.token]);
 
@@ -178,7 +178,7 @@ function ProductList({ ims }) {
       const result = await actionWebInvoke(actions["product/get"], authHeaders, { sku: product.sku }, { method: "GET" });
       setEditingProduct(result?.response?.product ?? product);
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     } finally {
       setFetchingSku(null);
     }
@@ -194,7 +194,7 @@ function ProductList({ ims }) {
       setEditingProduct(null);
       setReloadToken((t) => t + 1);
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     } finally {
       setIsSaving(false);
     }
@@ -221,7 +221,7 @@ function ProductList({ ims }) {
         setReloadToken((t) => t + 1);
       }
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     } finally {
       setIsSaving(false);
     }

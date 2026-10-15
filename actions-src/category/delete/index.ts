@@ -1,7 +1,8 @@
-import { initializeLogger, logError } from "../../logger";
+import { initializeLogger } from "../../logger";
 import { actionErrorResponse, actionSuccessResponse } from "../../responses";
 import { AppResponse, HttpStatus } from "../../types/request";
 import { AdobeCommerceClient } from "../../utils/adobe-commerce/adobe-commerce-client";
+import { commerceErrorResponse } from "../../utils/adobe-commerce/errors";
 import { CategoryDeleteParams } from "../types/request";
 
 export async function main(params: CategoryDeleteParams): Promise<AppResponse> {
@@ -26,8 +27,6 @@ export async function main(params: CategoryDeleteParams): Promise<AppResponse> {
 
     return actionSuccessResponse("Category deleted");
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, `Request failed: ${errorMessage}`);
+    return commerceErrorResponse(error, "Category delete", "Category not found. It may already have been deleted.");
   }
 }

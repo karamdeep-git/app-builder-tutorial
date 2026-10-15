@@ -31,7 +31,7 @@ import Delete from "@spectrum-icons/workflow/Delete";
 import AddCircle from "@spectrum-icons/workflow/AddCircle";
 
 import allActions from "../config.json";
-import actionWebInvoke from "../utils";
+import actionWebInvoke, { describeError } from "../utils";
 
 function indent(name, level) {
   return "    ".repeat(level) + name;
@@ -104,7 +104,7 @@ function CategoryManager({ ims }) {
       const result = await actionWebInvoke(allActions["category/list"], authHeaders, {}, { method: "GET" });
       setCategories(result?.response?.categories ?? []);
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     } finally {
       setIsLoading(false);
     }
@@ -140,7 +140,7 @@ function CategoryManager({ ims }) {
       setEditingCategory(null);
       await loadCategories();
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     } finally {
       setIsSaving(false);
     }
@@ -157,7 +157,7 @@ function CategoryManager({ ims }) {
       );
       setEditingCategory(result?.response?.category ?? category);
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     }
   }
 
@@ -176,7 +176,7 @@ function CategoryManager({ ims }) {
       setDeletingCategory(null);
       await loadCategories();
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     } finally {
       setIsSaving(false);
     }

@@ -27,6 +27,7 @@ export interface AdobeCommerceClientOptions {
   version?: string;
   storeCode?: string;
   useStoreCodeInPath?: boolean;
+  timeoutMs?: number;
   auth:
     | {
         type: "oauth1a";
@@ -48,6 +49,7 @@ export class AdobeCommerceClient {
   private imsToken?: string;
   private imsTokenExpiry?: Date;
   private useStoreCodeInPath: boolean;
+  private timeoutMs?: number;
 
   constructor(options: AdobeCommerceClientOptions) {
     this.serverUrl = options.url;
@@ -55,6 +57,7 @@ export class AdobeCommerceClient {
     this.storeCode = options.storeCode;
     this.authConfig = options.auth;
     this.useStoreCodeInPath = options.useStoreCodeInPath ?? false;
+    this.timeoutMs = options.timeoutMs;
 
     if (this.authConfig.type === "oauth1a") {
       this.initializeOAuth1a();
@@ -95,11 +98,17 @@ export class AdobeCommerceClient {
     if ("COMMERCE_CONSUMER_KEY" in params) {
       // OAuth 1.0a authentication (has Commerce-specific fields)
       const commerceParams = params as CommerceParams;
-      return this.createWithOAuth1a(commerceParams, baseUrl, storeConfig.storeCode, useStoreCodeInPath);
+      return this.createWithOAuth1a(
+        commerceParams,
+        baseUrl,
+        storeConfig.storeCode,
+        useStoreCodeInPath,
+        storeConfig.timeoutMs
+      );
     } else {
       // IMS authentication (has OAUTH_CLIENT_ID but not Commerce fields)
       const adobeImsParams = params as AdobeImsParams;
-      return this.createWithIms(adobeImsParams, baseUrl, storeConfig.storeCode, useStoreCodeInPath);
+      return this.createWithIms(adobeImsParams, baseUrl, storeConfig.storeCode, useStoreCodeInPath, storeConfig.timeoutMs);
     }
   }
 
@@ -107,13 +116,15 @@ export class AdobeCommerceClient {
     adobeImsParams: AdobeImsParams,
     baseUrl: string,
     storeCode?: string,
-    useStoreCodeInPath?: boolean
+    useStoreCodeInPath?: boolean,
+    timeoutMs?: number
   ): AdobeCommerceClient {
     const clientOptions: AdobeCommerceClientOptions = {
       url: `${baseUrl}rest/`,
       version: "V1",
       storeCode,
       useStoreCodeInPath,
+      timeoutMs,
       auth: {
         type: "ims",
         ims: {
@@ -132,13 +143,15 @@ export class AdobeCommerceClient {
     commerceParams: CommerceParams,
     baseUrl: string,
     storeCode?: string,
-    useStoreCodeInPath?: boolean
+    useStoreCodeInPath?: boolean,
+    timeoutMs?: number
   ): AdobeCommerceClient {
     const clientOptions: AdobeCommerceClientOptions = {
       url: `${baseUrl}rest/`,
       version: "V1",
       storeCode,
       useStoreCodeInPath,
+      timeoutMs,
       auth: {
         type: "oauth1a",
         oauth1a: {
@@ -282,18 +295,23 @@ export class AdobeCommerceClient {
         headers,
         data: requestData.body,
         responseType: "json",
+        ...(this.timeoutMs ? { timeout: this.timeoutMs } : {}),
       });
 
       return response.data;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logError(`Error fetching URL ${requestData.url}: ${errorMessage}`);
+      // The query string and response body can carry customer PII (search
+      // terms, emails echoed back in Magento validation errors), so the
+      // error-level line logs only the path; the full URL and body go to
+      // debug, which actions that handle PII run without (LOG_LEVEL: info).
+      logError(`Error fetching URL ${requestData.url.split("?")[0]}: ${errorMessage}`);
       if (
         error instanceof Error &&
         "response" in error &&
         (error as { response?: { data?: unknown } }).response?.data
       ) {
-        logError(
+        logDebug(
           `Error body ${requestData.url}: ${JSON.stringify((error as { response: { data: unknown } }).response.data)}`
         );
       }

@@ -104,6 +104,38 @@ Same async-job architecture as Indexing, in a second custom module:
   `di:compile` and `static-content:deploy` (full run of all 5 completes in ~60s on
   this instance).
 
+## 5a. Customer Management (`web-src/src/components/CustomerManager.js`)
+
+Search, view, create and delete Magento customers, entirely through Magento's
+default REST API (no custom module). Details, endpoint table and error mapping are in
+`CONFIGURATION.md` §5c.
+
+- Replaced four leftover template actions that stored "customers" in Adobe I/O State
+  and never reached Magento.
+- Create sends no password: Magento emails the customer a set-password link.
+- Added a shared `commerceErrorResponse` helper (specific 400/404/429/502/504
+  responses instead of a blanket 500), a shared `buildSearchCriteriaQuery`, and an
+  optional `timeoutMs` on `AdobeCommerceClient`. The error helper was later rolled out
+  to every web action (and `describeError()` to every page); the timeout is still
+  opt-in, customer actions only.
+- Removed the App Builder template pages (Home, About, "Your App Actions") from the
+  menu, routes and codebase.
+- Customer search terms and Magento error values are kept out of error-level logs.
+
+## 5b. Scheduled low-stock alerts (`actions-src/inventory/low-stock-check`)
+
+A `web: "no"` action with no URL, run every 60 minutes by an Adobe I/O Runtime alarms
+trigger declared in `app.config.yaml`. It finds products at or below 5 units through
+Magento's default `GET /V1/stockItems/lowStock`, filters out parents, untracked and
+disabled products, and posts one notification per run to the existing bell, only for
+products that are newly low. Notifications gained a `type` (`order` | `low_stock`),
+and older entries still read as orders. Demo and details are in `CONFIGURATION.md` §5d.
+
+Also found and fixed while testing the Customers page: 17 of 18 Magento caches on
+`testapp` were disabled, so every request (and every per-minute cron process) rebuilt
+Magento's config from scratch. Requests took 15–33s and the machine load was ~53.
+`bin/magento cache:enable` brought requests to ~0.05s.
+
 ## 6. Real bugs found and fixed along the way
 
 - **Login payload shape mismatch** — frontend sent a flat `{username, password}`
@@ -173,7 +205,7 @@ Same async-job architecture as Indexing, in a second custom module:
 | Frontend pages | `web-src/src/components/{Login,Dashboard,ProductList,ProductEditDialog,ProductSearchResults,Indexing,CommandManager}.js` |
 | Magento module: reindexing | `testapp/app/code/Kinex/Reindex/` |
 | Magento module: CLI commands | `testapp/app/code/Kinex/CommandManager/` |
-| Tests | `test/*.test.ts` (129 passing) |
+| Tests | `test/*.test.ts` (345 passing) |
 
 ---
 

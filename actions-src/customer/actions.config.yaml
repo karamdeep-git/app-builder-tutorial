@@ -1,9 +1,18 @@
-create:
-  function: ../../actions/customer/create/index.js
+# Every customer action proxies Magento's default customer REST API - no
+# custom module. LOG_LEVEL is info (not debug like most packages): customer
+# searches put names/emails in request URLs, and AdobeCommerceClient only
+# writes full URLs and Magento error bodies at debug level.
+list:
+  function: ../../actions/customer/list/index.js
   web: "yes"
   runtime: nodejs:20
   inputs:
-    LOG_LEVEL: debug
+    LOG_LEVEL: info
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
 
   annotations:
     require-adobe-auth: true
@@ -14,18 +23,28 @@ get:
   web: "yes"
   runtime: nodejs:20
   inputs:
-    LOG_LEVEL: debug
+    LOG_LEVEL: info
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
 
   annotations:
     require-adobe-auth: true
     final: true
 
-list:
-  function: ../../actions/customer/list/index.js
+create:
+  function: ../../actions/customer/create/index.js
   web: "yes"
   runtime: nodejs:20
   inputs:
-    LOG_LEVEL: debug
+    LOG_LEVEL: info
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
 
   annotations:
     require-adobe-auth: true
@@ -36,7 +55,28 @@ delete:
   web: "yes"
   runtime: nodejs:20
   inputs:
-    LOG_LEVEL: debug
+    LOG_LEVEL: info
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
+
+  annotations:
+    require-adobe-auth: true
+    final: true
+
+options:
+  function: ../../actions/customer/options/index.js
+  web: "yes"
+  runtime: nodejs:20
+  inputs:
+    LOG_LEVEL: info
+    COMMERCE_BASE_URL: $COMMERCE_BASE_URL
+    COMMERCE_CONSUMER_KEY: $COMMERCE_CONSUMER_KEY
+    COMMERCE_CONSUMER_SECRET: $COMMERCE_CONSUMER_SECRET
+    COMMERCE_ACCESS_TOKEN: $COMMERCE_ACCESS_TOKEN
+    COMMERCE_ACCESS_TOKEN_SECRET: $COMMERCE_ACCESS_TOKEN_SECRET
 
   annotations:
     require-adobe-auth: true

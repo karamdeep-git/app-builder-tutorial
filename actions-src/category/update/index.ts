@@ -1,7 +1,8 @@
-import { initializeLogger, logError } from "../../logger";
+import { initializeLogger } from "../../logger";
 import { actionErrorResponse, successResponse } from "../../responses";
 import { AppResponse, HttpStatus } from "../../types/request";
 import { AdobeCommerceClient } from "../../utils/adobe-commerce/adobe-commerce-client";
+import { commerceErrorResponse } from "../../utils/adobe-commerce/errors";
 import { CategoryUpdateParams } from "../types/request";
 
 export async function main(params: CategoryUpdateParams): Promise<AppResponse> {
@@ -37,8 +38,6 @@ export async function main(params: CategoryUpdateParams): Promise<AppResponse> {
 
     return successResponse("Category updated", { category: updated });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, `Request failed: ${errorMessage}`);
+    return commerceErrorResponse(error, "Category update", "Category not found. It may have been deleted.");
   }
 }

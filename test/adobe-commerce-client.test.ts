@@ -1,6 +1,6 @@
 import { getImsAccessToken } from "@adobe/commerce-sdk-auth";
 import axios from "axios";
-import { initializeTestLogger } from "../actions-src/logger";
+import { initializeTestLogger, logDebug, logError } from "../actions-src/logger";
 import { StoreConfig } from "../actions-src/types/commerce";
 import { AdobeImsParams } from "../actions-src/types/request";
 import { AdobeCommerceClient } from "../actions-src/utils/adobe-commerce/adobe-commerce-client";
@@ -657,6 +657,55 @@ describe("AdobeCommerceClient", () => {
       mockAxios.mockRejectedValue("String error");
 
       await expect(client.get("/products")).rejects.toEqual("String error");
+    });
+
+    it("keeps the query string and response body out of error-level logs (they can carry PII)", async () => {
+      const error = Object.assign(new Error("Request failed with status code 400"), {
+        response: { data: { message: "bad", parameters: { email: "pii@example.com" } } },
+      });
+      mockAxios.mockRejectedValue(error);
+
+      await expect(client.get("/customers/search?searchCriteria[value]=pii%40example.com")).rejects.toThrow();
+
+      const errorLines = (logError as jest.Mock).mock.calls.map((call) => String(call[0])).join("\n");
+      expect(errorLines).toContain("https://example.com/rest/us/V1/customers/search:");
+      expect(errorLines).not.toContain("pii");
+      expect(logDebug).toHaveBeenCalledWith(expect.stringContaining("pii@example.com"));
+    });
+  });
+
+  describe("timeout", () => {
+    const commerceParams: CommerceParams = {
+      COMMERCE_BASE_URL: "https://example.com/",
+      COMMERCE_CONSUMER_KEY: "key",
+      COMMERCE_CONSUMER_SECRET: "secret",
+      COMMERCE_ACCESS_TOKEN: "token",
+      COMMERCE_ACCESS_TOKEN_SECRET: "token-secret",
+    };
+
+    it("passes StoreConfig.timeoutMs through to axios", async () => {
+      mockAxios.mockResolvedValue({ data: {} } as never);
+      const client = AdobeCommerceClient.create(commerceParams, {
+        storeCode: "default",
+        storeUrl: commerceParams.COMMERCE_BASE_URL,
+        timeoutMs: 15000,
+      });
+
+      await client.get("/customers/1");
+
+      expect(mockAxios).toHaveBeenCalledWith(expect.objectContaining({ timeout: 15000 }));
+    });
+
+    it("sends no timeout when none is configured (existing actions unchanged)", async () => {
+      mockAxios.mockResolvedValue({ data: {} } as never);
+      const client = AdobeCommerceClient.create(commerceParams, {
+        storeCode: "default",
+        storeUrl: commerceParams.COMMERCE_BASE_URL,
+      });
+
+      await client.get("/products");
+
+      expect(mockAxios.mock.calls[0][0]).not.toHaveProperty("timeout");
     });
   });
 

@@ -3,6 +3,7 @@ import { actionErrorResponse, actionSuccessResponse } from "../../responses";
 import { AppResponse, HttpStatus } from "../../types/request";
 import { AdobeCommerceClient } from "../../utils/adobe-commerce/adobe-commerce-client";
 import { login, setProductStatusAllStores } from "../../utils/adobe-commerce/admin-session-client";
+import { commerceErrorResponse } from "../../utils/adobe-commerce/errors";
 import { getStateClient } from "../../utils/lib-state/state-client";
 import { Product, PRODUCT_STATE_TTL_SECONDS, productStateKey } from "../types/product";
 import { ProductUpdateParams } from "../types/request";
@@ -169,8 +170,6 @@ export async function main(params: ProductUpdateParams): Promise<AppResponse> {
 
     return actionSuccessResponse(exists ? "Product updated" : "Product created");
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, `Request failed: ${errorMessage}`);
+    return commerceErrorResponse(error, "Product save");
   }
 }

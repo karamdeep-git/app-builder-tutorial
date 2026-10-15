@@ -1,24 +1,34 @@
-import { initializeLogger, logError } from "../../logger";
+import { initializeLogger } from "../../logger";
 import { actionErrorResponse, successResponse } from "../../responses";
 import { AppResponse, HttpStatus } from "../../types/request";
-import { getStateClient } from "../../utils/lib-state/state-client";
-import { Customer } from "../types/customer";
-import { CustomerGetParams } from "../types/request";
+import { AdobeCommerceClient } from "../../utils/adobe-commerce/adobe-commerce-client";
+import { commerceErrorResponse, UnexpectedCommerceResponseError } from "../../utils/adobe-commerce/errors";
+import { MagentoCustomer, toCustomerDetail } from "../types/customer";
+import { COMMERCE_TIMEOUT_MS, CustomerGetParams, parseId } from "../types/request";
 
+/** Proxies Magento's default GET /V1/customers/{customerId}. */
 export async function main(params: CustomerGetParams): Promise<AppResponse> {
-  initializeLogger("process-function");
+  initializeLogger("process-function", params.LOG_LEVEL ?? "info");
 
   try {
-    const customerId = params.customerId;
+    const customerId = parseId(params.customerId);
+    if (customerId === null) {
+      return actionErrorResponse(HttpStatus.BAD_REQUEST, "Missing or invalid customerId");
+    }
 
-    const stateClient = await getStateClient();
-    const entry = await stateClient.get(`customer-${customerId}`);
-    const customer = JSON.parse(entry.value) as Customer;
+    const client = AdobeCommerceClient.create(params, {
+      storeCode: "default",
+      storeUrl: params.COMMERCE_BASE_URL,
+      timeoutMs: COMMERCE_TIMEOUT_MS,
+    });
 
-    return successResponse("Customer fetched", { customer });
+    const customer = await client.get<MagentoCustomer>(`/customers/${customerId}`);
+    if (typeof customer?.id !== "number") {
+      throw new UnexpectedCommerceResponseError("GET /customers/{id} returned no customer id");
+    }
+
+    return successResponse("Customer", { customer: toCustomerDetail(customer) });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, `Request failed: ${errorMessage}`);
+    return commerceErrorResponse(error, "Customer get", "Customer not found. It may have been deleted.");
   }
 }

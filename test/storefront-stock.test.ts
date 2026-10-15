@@ -85,22 +85,38 @@ describe("storefront stock action", () => {
     expect(mockAxios.get).not.toHaveBeenCalled();
   });
 
-  it("returns a 500 error when Magento's config lookup fails, with no CORS header", async () => {
-    mockAxios.mockRejectedValue(new Error("Request failed with status code 401"));
+  it("returns a generic 502 when Magento's config lookup fails, with no CORS header and no Magento detail", async () => {
+    mockAxios.mockRejectedValue(
+      Object.assign(new Error("Request failed with status code 401"), {
+        response: { status: 401, data: { message: "The consumer isn't authorized" } },
+      })
+    );
 
     const result = await main({ ...baseParams, __ow_headers: { origin: "https://www.yourstore.com" } });
 
-    expect(result.statusCode).toBe(500);
-    expect(result.headers).toBeUndefined();
+    expect(result).toEqual({ statusCode: 502, body: { success: false, error: "Stock information is unavailable" } });
   });
 
-  it("returns a 500 error when the external stock API call fails", async () => {
+  it("returns a generic 502 when the external stock API fails, never echoing upstream error text to shoppers", async () => {
     mockAxios.mockResolvedValue({ data: magentoConfig });
-    mockAxios.get = jest.fn().mockRejectedValue(new Error("Request failed with status code 503"));
+    mockAxios.get = jest
+      .fn()
+      .mockRejectedValue(new Error("getaddrinfo ENOTFOUND erp.internal.yourstore.com"));
 
     const result = await main({ ...baseParams, __ow_headers: { origin: "https://www.yourstore.com" } });
 
-    expect(result.statusCode).toBe(500);
-    expect(result.body).toMatchObject({ success: false });
+    expect(result.statusCode).toBe(502);
+    expect(result.body).toEqual({ success: false, error: "Stock information is unavailable" });
+    expect(JSON.stringify(result.body)).not.toContain("erp.internal");
+    expect(result.headers).toBeDefined();
+  });
+
+  it("returns 504 when the external stock API times out", async () => {
+    mockAxios.mockResolvedValue({ data: magentoConfig });
+    mockAxios.get = jest.fn().mockRejectedValue(Object.assign(new Error("canceled"), { code: "ERR_CANCELED" }));
+
+    const result = await main({ ...baseParams, __ow_headers: { origin: "https://www.yourstore.com" } });
+
+    expect(result.statusCode).toBe(504);
   });
 });

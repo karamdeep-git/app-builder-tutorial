@@ -24,7 +24,7 @@ describe("auth login action", () => {
     jest.clearAllMocks();
   });
 
-  it("returns the admin token on successful login", async () => {
+  it("verifies the credentials with Magento but never returns Magento's admin token", async () => {
     mockAxios.mockResolvedValue({ data: "abc123token" });
 
     const params: AdminLoginParams = { ...baseParams, data: { username: "admin", password: "Admin123" } };
@@ -40,8 +40,17 @@ describe("auth login action", () => {
     expect(result.statusCode).toBe(200);
     expect(result.body).toEqual({
       type: "Login successful",
-      response: { username: "admin", token: "abc123token" },
+      response: { username: "admin" },
     });
+    expect(JSON.stringify(result.body)).not.toContain("abc123token");
+  });
+
+  it("refuses the login if Magento answers 200 without a token", async () => {
+    mockAxios.mockResolvedValue({ data: "" });
+
+    const result = await main({ ...baseParams, data: { username: "admin", password: "Admin123" } });
+
+    expect(result.statusCode).toBe(502);
   });
 
   it("returns a 401 when Magento rejects the credentials", async () => {

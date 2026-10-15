@@ -19,7 +19,7 @@ import LockClosed from "@spectrum-icons/workflow/LockClosed";
 import LockOpen from "@spectrum-icons/workflow/LockOpen";
 
 import allActions from "../config.json";
-import actionWebInvoke from "../utils";
+import actionWebInvoke, { describeError } from "../utils";
 
 function AdminUserManager({ ims, currentUsername }) {
   const [users, setUsers] = useState([]);
@@ -40,7 +40,7 @@ function AdminUserManager({ ims, currentUsername }) {
       const result = await actionWebInvoke(allActions["admin-users/list"], authHeaders, {}, { method: "GET" });
       setUsers(result?.response?.users ?? []);
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     } finally {
       setIsLoading(false);
     }
@@ -74,7 +74,7 @@ function AdminUserManager({ ims, currentUsername }) {
       setMessage(`"${user.username}" activated.`);
       setUserFields(user.id, { isSaving: false });
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
       setUserFields(user.id, { isActive: false, isSaving: false });
     }
   }
@@ -94,7 +94,7 @@ function AdminUserManager({ ims, currentUsername }) {
       setMessage(`"${user.username}" deactivated.`);
       setUserFields(user.id, { isSaving: false });
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
       setUserFields(user.id, { isActive: true, isSaving: false });
     }
   }

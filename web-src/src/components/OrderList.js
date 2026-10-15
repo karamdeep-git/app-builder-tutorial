@@ -16,7 +16,7 @@ import PropTypes from "prop-types";
 import { useSearchParams } from "react-router-dom";
 
 import allActions from "../config.json";
-import actionWebInvoke from "../utils";
+import actionWebInvoke, { describeError } from "../utils";
 import OrderDetail from "./OrderDetail";
 
 const actions = Object.keys(allActions).reduce((obj, key) => {
@@ -156,7 +156,7 @@ function OrderList({ ims }) {
           setTotalCount(result?.response?.totalCount ?? 0);
         }
       } catch (e) {
-        if (!cancelled) setError(e.message);
+        if (!cancelled) setError(describeError(e));
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -180,7 +180,7 @@ function OrderList({ ims }) {
       const detail = await loadOrderDetail({ orderId });
       setViewingOrder(detail);
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     } finally {
       setFetchingOrderId(null);
     }
@@ -198,7 +198,7 @@ function OrderList({ ims }) {
       setError(null);
       loadOrderDetail({ incrementId: openOrderIncrementId })
         .then(setViewingOrder)
-        .catch((e) => setError(e.message));
+        .catch((e) => setError(describeError(e)));
       setSearchParams({}, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -240,7 +240,7 @@ function OrderList({ ims }) {
       setViewingOrder((current) => (current && current.order.entity_id === orderId ? refreshed : current));
       setReloadToken((t) => t + 1);
     } catch (e) {
-      setActionError(e.message);
+      setActionError(describeError(e));
     } finally {
       setIsActionLoading(false);
     }

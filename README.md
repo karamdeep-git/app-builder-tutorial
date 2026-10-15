@@ -17,7 +17,15 @@ all driven from a single React + Adobe Spectrum UI and TypeScript backend action
   commands (`setup:upgrade`, `cache:flush`, `cache:clean`,
   `setup:static-content:deploy -f`, `setup:di:compile`, maintenance
   enable/disable) from the UI, sequentially, with live progress and history.
-- **Customers** — list, view, create, and delete customers.
+- **Customers** — search, view (with addresses), create, and delete Magento
+  customers via Magento's default REST API. New customers get Magento's email to
+  set their own password; admins never handle customer passwords.
+- **Dashboard** — today's sales and order count (in the store's own timezone), plus
+  totals for orders, customers, enabled products and active admins, all read live from
+  Magento. See [CONFIGURATION.md §5e](CONFIGURATION.md).
+- **Low-stock alerts** — a scheduled, URL-less (`web: "no"`) action checks stock
+  every hour and posts newly low products to the notification bell. See
+  [CONFIGURATION.md §5d](CONFIGURATION.md).
 - **Login** — admin session login against Adobe Commerce, used to gate the app.
 - **Security** — every admin backend action requires a valid Adobe IMS token
   (`require-adobe-auth: true`), so the app must be opened through the Experience
@@ -109,7 +117,7 @@ access to run `bin/magento` commands or read indexer state — see
 app-builder-tutorial/
 ├── actions-src/                    # TypeScript source for backend actions
 │   ├── auth/                       # Admin login
-│   ├── customer/                   # Customer list/get/create/delete
+│   ├── customer/                   # Customer list/get/create/delete/options
 │   ├── product/                    # Product list/get/search/update/delete,
 │   │                                # categories lookup, events consumer
 │   ├── category/                   # Category list/get/create/update/delete
@@ -129,9 +137,10 @@ app-builder-tutorial/
 │   ├── App.js, SideBar.js          # Shell, routing, navigation
 │   ├── ProductList.js, ProductEditDialog.js, ProductSearchResults.js
 │   ├── CategoryManager.js
+│   ├── CustomerManager.js, CustomerDetail.js, CustomerCreateDialog.js
 │   ├── Indexing.js
 │   ├── CommandManager.js
-│   ├── Dashboard.js, Home.js, About.js, Login.js, ActionsForm.js
+│   ├── Dashboard.js, Login.js
 ├── packages/commerce-sdk-auth/     # Local package: Commerce SDK auth helper
 ├── test/                           # Jest tests (one suite per action)
 ├── app.config.yaml                 # App Builder manifest (packages/actions)
@@ -169,11 +178,13 @@ Each package below is a directory under `actions-src/`, wired into
 | Package    | Actions                                              |
 | ---------- | ----------------------------------------------------- |
 | `auth`     | `login`                                                |
-| `customer` | `list`, `get`, `create`, `delete`                      |
+| `customer` | `list`, `get`, `create`, `delete`, `options`           |
 | `product`  | `list`, `get`, `search`, `update`, `delete`, `categories`, `events-consumer` |
 | `category` | `list`, `get`, `create`, `update`, `delete`            |
 | `indexer`  | `list`, `reindex`, `reindex-status`                    |
 | `commands` | `list`, `run`, `status`, `history`                     |
+| `inventory` | `low-stock-check` (non-web, runs hourly via an alarms trigger) |
+| `dashboard` | `stats` |
 
 ## Adobe Commerce Integration
 

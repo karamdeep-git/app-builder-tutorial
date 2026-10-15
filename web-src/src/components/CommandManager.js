@@ -17,7 +17,7 @@ import {
 } from "@adobe/react-spectrum";
 
 import allActions from "../config.json";
-import actionWebInvoke from "../utils";
+import actionWebInvoke, { describeError } from "../utils";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -92,7 +92,7 @@ function CommandManager({ ims, currentUser }) {
       const result = await actionWebInvoke(allActions["commands/list"], authHeaders, {}, { method: "GET" });
       setCommands(result?.response?.commands ?? []);
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ims?.token]);
@@ -102,7 +102,7 @@ function CommandManager({ ims, currentUser }) {
       const result = await actionWebInvoke(allActions["commands/history"], authHeaders, {}, { method: "GET" });
       setHistory(result?.response?.jobs ?? []);
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ims?.token]);
@@ -135,7 +135,7 @@ function CommandManager({ ims, currentUser }) {
           loadHistory();
         }
       } catch (e) {
-        setError(e.message);
+        setError(describeError(e));
         clearInterval(pollRef.current);
         pollRef.current = null;
       }
@@ -166,7 +166,7 @@ function CommandManager({ ims, currentUser }) {
       });
       pollStatus(jobId);
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     } finally {
       setIsStarting(false);
     }

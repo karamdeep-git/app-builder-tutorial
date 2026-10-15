@@ -1,7 +1,8 @@
 import axios from "axios";
-import { initializeLogger, logError } from "../../logger";
+import { initializeLogger } from "../../logger";
 import { actionErrorResponse, successResponse } from "../../responses";
 import { AppResponse, HttpStatus } from "../../types/request";
+import { commerceErrorResponse, UnexpectedCommerceResponseError } from "../../utils/adobe-commerce/errors";
 import { AdminLoginParams } from "../types/request";
 
 function isUnauthorized(error: unknown): boolean {
@@ -25,14 +26,20 @@ export async function main(params: AdminLoginParams): Promise<AppResponse> {
       responseType: "json",
     });
 
-    return successResponse("Login successful", { username, token: response.data });
+    // Magento issuing a token is the proof the credentials are valid - the token
+    // itself never leaves this action. It's a full admin API key for the store,
+    // and the app only needs to know *who* logged in.
+    if (typeof response.data !== "string" || !response.data) {
+      throw new UnexpectedCommerceResponseError("POST /integration/admin/token returned no token");
+    }
+    return successResponse("Login successful", { username });
   } catch (error: unknown) {
+    // Checked first on purpose: here a 401 is the admin's own wrong
+    // credentials, not this app's integration being rejected - which is what
+    // commerceErrorResponse (502) assumes a Magento 401 means everywhere else.
     if (isUnauthorized(error)) {
       return actionErrorResponse(HttpStatus.UNAUTHORIZED, "Invalid username or password");
     }
-
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, `Request failed: ${errorMessage}`);
+    return commerceErrorResponse(error, "Admin login");
   }
 }

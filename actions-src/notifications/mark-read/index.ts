@@ -1,6 +1,7 @@
-import { initializeLogger, logError } from "../../logger";
+import { initializeLogger } from "../../logger";
 import { actionErrorResponse, successResponse } from "../../responses";
 import { AppResponse, HttpStatus } from "../../types/request";
+import { commerceErrorResponse } from "../../utils/adobe-commerce/errors";
 import { getStateClient } from "../../utils/lib-state/state-client";
 import { loadNotifications, saveNotifications } from "../types/notification";
 import { NotificationsMarkReadParams } from "../types/request";
@@ -22,8 +23,6 @@ export async function main(params: NotificationsMarkReadParams): Promise<AppResp
     const unreadCount = updated.filter((n) => !n.read).length;
     return successResponse("Notifications updated", { notifications: updated, unreadCount });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, `Request failed: ${errorMessage}`);
+    return commerceErrorResponse(error, "Notifications mark-read");
   }
 }

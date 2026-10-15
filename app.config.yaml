@@ -1,6 +1,15 @@
 application:
   hooks:
     pre-app-build: npm run build
+  web:
+    # index.html was served with no Cache-Control, so browsers kept reusing an
+    # old copy for hours after a deploy - loading the previous JS bundle. With
+    # no-cache the browser revalidates it on every load (a cheap 304 when
+    # unchanged). The JS/CSS bundles are content-hashed (web-src.<hash>.js),
+    # so a new deploy always gets new file names and they can stay cached.
+    response-headers:
+      /*.html:
+        cache-control: no-cache
   runtimeManifest:
     packages:
       customer:
@@ -52,6 +61,27 @@ application:
         license: Apache-2.0
         actions:
           $include: ./actions-src/admin-users/actions.config.yaml
+
+      dashboard:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/dashboard/actions.config.yaml
+
+      inventory:
+        license: Apache-2.0
+        actions:
+          $include: ./actions-src/inventory/actions.config.yaml
+        # Runs inventory/low-stock-check every 60 minutes via Adobe I/O
+        # Runtime's built-in alarms package - no server or cron to maintain.
+        triggers:
+          low-stock-every-hour:
+            feed: /whisk.system/alarms/interval
+            inputs:
+              minutes: 60
+        rules:
+          low-stock-every-hour-rule:
+            trigger: low-stock-every-hour
+            action: low-stock-check
 
 productDependencies:
   - code: COMMC

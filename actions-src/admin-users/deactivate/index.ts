@@ -1,23 +1,9 @@
-import axios from "axios";
-import { initializeLogger, logError } from "../../logger";
+import { initializeLogger } from "../../logger";
 import { actionErrorResponse, actionSuccessResponse } from "../../responses";
 import { AppResponse, HttpStatus } from "../../types/request";
 import { AdobeCommerceClient } from "../../utils/adobe-commerce/adobe-commerce-client";
+import { commerceErrorResponse } from "../../utils/adobe-commerce/errors";
 import { AdminUserDeactivateParams } from "../types/request";
-
-function extractErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error) && typeof error.response?.data?.message === "string") {
-    return error.response.data.message;
-  }
-  return error instanceof Error ? error.message : "Unknown error";
-}
-
-function extractErrorStatus(error: unknown): HttpStatus {
-  if (axios.isAxiosError(error) && error.response?.status === 400) {
-    return HttpStatus.BAD_REQUEST;
-  }
-  return HttpStatus.INTERNAL_ERROR;
-}
 
 export async function main(params: AdminUserDeactivateParams): Promise<AppResponse> {
   initializeLogger("process-function");
@@ -34,13 +20,12 @@ export async function main(params: AdminUserDeactivateParams): Promise<AppRespon
 
     // Magento itself refuses a request that would leave zero active admin
     // users (Kinex\ZLF31QCAN\Model\AdminUserManagement::deactivate) and
-    // returns a 400 with a human-readable message - surfaced as-is below.
+    // returns a 400 with a human-readable message - commerceErrorResponse
+    // passes that through to the admin as a 400.
     await client.post("/kinex-admin-users/deactivate", { userIds: params.userIds });
 
     return actionSuccessResponse("Admin user(s) deactivated");
   } catch (error: unknown) {
-    const errorMessage = extractErrorMessage(error);
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(extractErrorStatus(error), errorMessage);
+    return commerceErrorResponse(error, "Admin user deactivate", "Admin user not found.");
   }
 }

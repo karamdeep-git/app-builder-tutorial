@@ -1,7 +1,8 @@
-import { initializeLogger, logError } from "../../logger";
-import { actionErrorResponse, successResponse } from "../../responses";
-import { AppResponse, HttpStatus } from "../../types/request";
+import { initializeLogger } from "../../logger";
+import { successResponse } from "../../responses";
+import { AppResponse } from "../../types/request";
 import { AdobeCommerceClient } from "../../utils/adobe-commerce/adobe-commerce-client";
+import { commerceErrorResponse } from "../../utils/adobe-commerce/errors";
 import { IndexerReindexParams } from "../types/request";
 
 export async function main(params: IndexerReindexParams): Promise<AppResponse> {
@@ -19,8 +20,6 @@ export async function main(params: IndexerReindexParams): Promise<AppResponse> {
 
     return successResponse("Job started", { jobId });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, `Request failed: ${errorMessage}`);
+    return commerceErrorResponse(error, "Reindex start");
   }
 }

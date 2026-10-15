@@ -22,6 +22,20 @@ interface StorefrontStockConfig {
   allowed_origin: string;
 }
 
+// The only public action: anonymous shoppers call it. Failures are logged in
+// full but answered with one generic message - never upstream error text,
+// hostnames or "Magento rejected our credentials" detail. (The widget shows
+// its own "unavailable" state on any non-2xx anyway.)
+const PUBLIC_ERROR = "Stock information is unavailable";
+const TIMEOUT_CODES = ["ECONNABORTED", "ETIMEDOUT", "ERR_CANCELED"];
+
+function upstreamErrorSummary(error: unknown): { summary: string; timedOut: boolean } {
+  const { response, code } = (error ?? {}) as { response?: { status?: number }; code?: string };
+  const timedOut = Boolean(code && TIMEOUT_CODES.includes(code));
+  const message = error instanceof Error ? error.message : String(error);
+  return { summary: `status=${response?.status ?? "none"} code=${code ?? "-"} ${message}`, timedOut };
+}
+
 export async function main(params: StorefrontStockParams): Promise<AppResponse> {
   initializeLogger("process-function");
 
@@ -35,9 +49,8 @@ export async function main(params: StorefrontStockParams): Promise<AppResponse> 
     });
     config = await client.get<StorefrontStockConfig>("/kinex-storefront-stock/config");
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Failed to load storefront stock config from Magento: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, "Storefront stock widget is not configured");
+    logError(`Storefront stock: failed to load config from Magento - ${upstreamErrorSummary(error).summary}`);
+    return actionErrorResponse(HttpStatus.BAD_GATEWAY, PUBLIC_ERROR);
   }
 
   const headers = corsHeaders(config.allowed_origin, requestOrigin);
@@ -82,8 +95,11 @@ export async function main(params: StorefrontStockParams): Promise<AppResponse> 
       headers,
     };
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Server error: ${errorMessage}`);
-    return { ...actionErrorResponse(HttpStatus.INTERNAL_ERROR, `Request failed: ${errorMessage}`), headers };
+    const { summary, timedOut } = upstreamErrorSummary(error);
+    logError(`Storefront stock: stock lookup failed - ${summary}`);
+    return {
+      ...actionErrorResponse(timedOut ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.BAD_GATEWAY, PUBLIC_ERROR),
+      headers,
+    };
   }
 }

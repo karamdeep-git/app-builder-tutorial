@@ -1,16 +1,9 @@
-import axios from "axios";
-import { initializeLogger, logError } from "../../logger";
+import { initializeLogger } from "../../logger";
 import { actionErrorResponse, actionSuccessResponse } from "../../responses";
 import { AppResponse, HttpStatus } from "../../types/request";
 import { AdobeCommerceClient } from "../../utils/adobe-commerce/adobe-commerce-client";
+import { commerceErrorResponse } from "../../utils/adobe-commerce/errors";
 import { AdminUserActivateParams } from "../types/request";
-
-function extractErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error) && typeof error.response?.data?.message === "string") {
-    return error.response.data.message;
-  }
-  return error instanceof Error ? error.message : "Unknown error";
-}
 
 export async function main(params: AdminUserActivateParams): Promise<AppResponse> {
   initializeLogger("process-function");
@@ -29,8 +22,6 @@ export async function main(params: AdminUserActivateParams): Promise<AppResponse
 
     return actionSuccessResponse("Admin user(s) activated");
   } catch (error: unknown) {
-    const errorMessage = extractErrorMessage(error);
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, errorMessage);
+    return commerceErrorResponse(error, "Admin user activate", "Admin user not found.");
   }
 }

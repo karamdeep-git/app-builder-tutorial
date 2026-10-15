@@ -15,9 +15,9 @@ import {
 import ErrorBoundary from "react-error-boundary";
 import { HashRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
 import SideBar from "./SideBar";
-import ActionsForm from "./ActionsForm";
 import ProductList from "./ProductList";
 import OrderList from "./OrderList";
+import CustomerManager from "./CustomerManager";
 import Login from "./Login";
 import Dashboard from "./Dashboard";
 import Indexing from "./Indexing";
@@ -25,12 +25,11 @@ import CommandManager from "./CommandManager";
 import CategoryManager from "./CategoryManager";
 import AdminUserManager from "./AdminUserManager";
 import NotificationBell from "./NotificationBell";
-import { Home } from "./Home";
-import { About } from "./About";
 import kinexLogo from "url:../assets/kinex-logo.webp";
 import allActions from "../config.json";
-import actionWebInvoke from "../utils";
+import actionWebInvoke, { describeError } from "../utils";
 import { playNotificationSound } from "../notificationSound";
+import { isLowStock, lowStockSummary, lowStockTitle } from "../notificationText";
 
 const ADMIN_USER_STORAGE_KEY = "adminUser";
 const NOTIFICATIONS_POLL_MS = 15000;
@@ -75,7 +74,7 @@ function ShellRequired() {
 // Owns order-notification polling so it keeps running across every page, not
 // just the Orders page - needs to live inside <Router> (for useNavigate) and
 // is otherwise a plain child of App, not a route itself.
-function AuthenticatedApp({ ims, runtime, currentUser, onLogout }) {
+function AuthenticatedApp({ ims, currentUser, onLogout }) {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -104,6 +103,14 @@ function AuthenticatedApp({ ims, runtime, currentUser, onLogout }) {
             playNotificationSound();
           }
           newArrivals.forEach((n) => {
+            if (isLowStock(n)) {
+              ToastQueue.negative(`${lowStockTitle(n)} - ${lowStockSummary(n)}`, {
+                actionLabel: "View products",
+                onAction: () => navigate("/"),
+                timeout: 8000,
+              });
+              return;
+            }
             ToastQueue.info(`New Order Received! #${n.incrementId} - ${n.customerName} - ${formatMoney(n.grandTotal, n.currencyCode)}`, {
               actionLabel: "View",
               onAction: () => navigate(`/orders?openOrderIncrementId=${n.incrementId}`),
@@ -117,7 +124,7 @@ function AuthenticatedApp({ ims, runtime, currentUser, onLogout }) {
         setUnreadCount(result?.response?.unreadCount ?? 0);
         setNotificationsError(null);
       } catch (e) {
-        setNotificationsError(e.message);
+        setNotificationsError(describeError(e));
       } finally {
         setIsLoadingNotifications(false);
       }
@@ -138,7 +145,7 @@ function AuthenticatedApp({ ims, runtime, currentUser, onLogout }) {
       setNotifications(result?.response?.notifications ?? []);
       setUnreadCount(result?.response?.unreadCount ?? 0);
     } catch (e) {
-      setNotificationsError(e.message);
+      setNotificationsError(describeError(e));
     }
   }
 
@@ -148,7 +155,7 @@ function AuthenticatedApp({ ims, runtime, currentUser, onLogout }) {
       setNotifications(result?.response?.notifications ?? []);
       setUnreadCount(result?.response?.unreadCount ?? 0);
     } catch (e) {
-      setNotificationsError(e.message);
+      setNotificationsError(describeError(e));
     }
   }
 
@@ -180,6 +187,7 @@ function AuthenticatedApp({ ims, runtime, currentUser, onLogout }) {
               isLoading={isLoadingNotifications}
               error={notificationsError}
               onOpenOrder={handleOpenOrder}
+              onOpenProducts={() => navigate("/")}
               onMarkRead={handleMarkRead}
               onMarkAllRead={handleMarkAllRead}
             />
@@ -201,14 +209,12 @@ function AuthenticatedApp({ ims, runtime, currentUser, onLogout }) {
         <Routes>
           <Route path="/" element={<ProductList ims={ims} />} />
           <Route path="/orders" element={<OrderList ims={ims} />} />
+          <Route path="/customers" element={<CustomerManager ims={ims} />} />
           <Route path="/dashboard" element={<Dashboard username={currentUser.username} ims={ims} />} />
           <Route path="/indexing" element={<Indexing ims={ims} />} />
           <Route path="/categories" element={<CategoryManager ims={ims} />} />
           <Route path="/admin-users" element={<AdminUserManager ims={ims} currentUsername={currentUser.username} />} />
           <Route path="/commands" element={<CommandManager ims={ims} currentUser={currentUser.username} />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/actions" element={<ActionsForm runtime={runtime} ims={ims} />} />
-          <Route path="/about" element={<About />} />
         </Routes>
       </View>
     </Grid>
@@ -261,7 +267,7 @@ function App(props) {
           ) : !currentUser ? (
             <Login ims={ims} onLoginSuccess={handleLoginSuccess} />
           ) : (
-            <AuthenticatedApp ims={ims} runtime={props.runtime} currentUser={currentUser} onLogout={handleLogout} />
+            <AuthenticatedApp ims={ims} currentUser={currentUser} onLogout={handleLogout} />
           )}
         </Provider>
       </Router>

@@ -2,6 +2,7 @@ import { initializeLogger, logError, logInfo } from "../../logger";
 import { actionErrorResponse, successResponse } from "../../responses";
 import { AppResponse, HttpStatus } from "../../types/request";
 import {
+  isOrderNotification,
   loadNotifications,
   MAX_NOTIFICATIONS,
   OrderNotification,
@@ -31,13 +32,14 @@ export async function main(params: OrderEventParams): Promise<AppResponse> {
 
     // Adobe I/O Events delivery is at-least-once, not exactly-once - a retry
     // must never produce a second notification for the same order.
-    if (notifications.some((n) => n.incrementId === order.increment_id)) {
+    if (notifications.some((n) => isOrderNotification(n) && n.incrementId === order.increment_id)) {
       logInfo(`Notification for order ${order.increment_id} already exists, skipping duplicate`);
       return successResponse(params.type, { success: true, message: "Duplicate, ignored" });
     }
 
     const notification: OrderNotification = {
       id: `order-${order.increment_id}`,
+      type: "order",
       incrementId: order.increment_id,
       customerName: getCustomerName({ customer_firstname: order.customer_firstname, customer_lastname: order.customer_lastname }),
       grandTotal: order.grand_total ?? 0,

@@ -52,6 +52,24 @@ describe("notifications list action", () => {
     expect(result.body).toMatchObject({ response: { notifications, unreadCount: 1 } });
   });
 
+  it("never shows the duplicate low-stock alert two overlapping runs stored, nor counts it as unread", async () => {
+    // The real pair from the first deploy: same products, posted ~1s apart.
+    const products = [
+      { sku: "test123", name: "storeparam-test", qty: 1 },
+      { sku: "Test121", name: "Test", qty: 2 },
+    ];
+    const stored = [
+      { id: "low-stock-2", type: "low_stock", products, totalCount: 2, threshold: 5, createdAt: "2026-10-13T06:09:17.100Z", read: false },
+      { id: "low-stock-1", type: "low_stock", products, totalCount: 2, threshold: 5, createdAt: "2026-10-13T06:09:16.200Z", read: false },
+    ];
+    mockStateClient.get.mockResolvedValue({ value: JSON.stringify(stored), expiration: "" });
+
+    const result = await main({});
+
+    expect(result.body).toMatchObject({ response: { notifications: [{ id: "low-stock-2" }], unreadCount: 1 } });
+    expect((result.body as { response: { notifications: unknown[] } }).response.notifications).toHaveLength(1);
+  });
+
   it("returns a 500 error when the state read fails", async () => {
     mockStateClient.get.mockRejectedValue(new Error("state unavailable"));
 

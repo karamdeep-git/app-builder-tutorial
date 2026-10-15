@@ -14,6 +14,7 @@ import {
   Text,
 } from "@adobe/react-spectrum";
 import Bell from "@spectrum-icons/workflow/Bell";
+import { isLowStock, lowStockSummary, lowStockTitle } from "../notificationText";
 
 function formatRelativeTime(value) {
   if (!value) return "";
@@ -35,7 +36,16 @@ function formatMoney(amount, currencyCode) {
   }
 }
 
-function NotificationBell({ notifications, unreadCount, isLoading, error, onOpenOrder, onMarkRead, onMarkAllRead }) {
+function NotificationBell({
+  notifications,
+  unreadCount,
+  isLoading,
+  error,
+  onOpenOrder,
+  onOpenProducts,
+  onMarkRead,
+  onMarkAllRead,
+}) {
   return (
     // DialogTrigger clones its first child to inject press/aria handlers, so
     // that child must stay the real ActionButton - the badge is positioned
@@ -47,7 +57,7 @@ function NotificationBell({ notifications, unreadCount, isLoading, error, onOpen
         </ActionButton>
         {(close) => (
           <Dialog width="size-4600">
-            <Heading level={4}>Order Notifications</Heading>
+            <Heading level={4}>Notifications</Heading>
             <Divider />
             <Content>
               {isLoading && notifications.length === 0 ? (
@@ -59,7 +69,7 @@ function NotificationBell({ notifications, unreadCount, isLoading, error, onOpen
                 <Text>Couldn&apos;t load notifications: {error}</Text>
               ) : notifications.length === 0 ? (
                 <IllustratedMessage>
-                  <Content>No order notifications yet.</Content>
+                  <Content>No notifications yet.</Content>
                 </IllustratedMessage>
               ) : (
                 <>
@@ -79,18 +89,24 @@ function NotificationBell({ notifications, unreadCount, isLoading, error, onOpen
                         style={{ backgroundColor: notification.read ? undefined : "#f5f5f5" }}
                         onClick={() => {
                           if (!notification.read) onMarkRead(notification.id);
-                          onOpenOrder(notification.incrementId);
+                          if (isLowStock(notification)) {
+                            onOpenProducts();
+                          } else {
+                            onOpenOrder(notification.incrementId);
+                          }
                           close();
                         }}
                       >
                         <Flex direction="row" justifyContent="space-between">
                           <Text UNSAFE_style={{ fontWeight: notification.read ? "normal" : 600 }}>
-                            New Order #{notification.incrementId}
+                            {isLowStock(notification) ? lowStockTitle(notification) : `New Order #${notification.incrementId}`}
                           </Text>
                           <Text>{formatRelativeTime(notification.createdAt)}</Text>
                         </Flex>
                         <Text>
-                          {notification.customerName} - {formatMoney(notification.grandTotal, notification.currencyCode)}
+                          {isLowStock(notification)
+                            ? lowStockSummary(notification)
+                            : `${notification.customerName} - ${formatMoney(notification.grandTotal, notification.currencyCode)}`}
                         </Text>
                       </div>
                     ))}
@@ -114,10 +130,16 @@ NotificationBell.propTypes = {
   notifications: PropTypes.arrayOf(
     PropTypes.shape({
       id: PropTypes.string.isRequired,
-      incrementId: PropTypes.string.isRequired,
+      // "order" (or missing, for older entries) or "low_stock"
+      type: PropTypes.string,
+      incrementId: PropTypes.string,
       customerName: PropTypes.string,
       grandTotal: PropTypes.number,
       currencyCode: PropTypes.string,
+      products: PropTypes.arrayOf(
+        PropTypes.shape({ sku: PropTypes.string, name: PropTypes.string, qty: PropTypes.number })
+      ),
+      totalCount: PropTypes.number,
       createdAt: PropTypes.string,
       read: PropTypes.bool,
     })
@@ -126,6 +148,7 @@ NotificationBell.propTypes = {
   isLoading: PropTypes.bool,
   error: PropTypes.string,
   onOpenOrder: PropTypes.func.isRequired,
+  onOpenProducts: PropTypes.func.isRequired,
   onMarkRead: PropTypes.func.isRequired,
   onMarkAllRead: PropTypes.func.isRequired,
 };

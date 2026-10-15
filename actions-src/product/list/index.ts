@@ -1,6 +1,7 @@
-import { initializeLogger, logError } from "../../logger";
-import { actionErrorResponse, successResponse } from "../../responses";
-import { AppResponse, HttpStatus } from "../../types/request";
+import { initializeLogger } from "../../logger";
+import { successResponse } from "../../responses";
+import { AppResponse } from "../../types/request";
+import { commerceErrorResponse } from "../../utils/adobe-commerce/errors";
 import { getStateClient } from "../../utils/lib-state/state-client";
 import { Product } from "../types/product";
 
@@ -22,8 +23,6 @@ export async function main(): Promise<AppResponse> {
 
     return successResponse("Product list", { products });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, `Request failed: ${errorMessage}`);
+    return commerceErrorResponse(error, "Product list");
   }
 }

@@ -150,7 +150,7 @@ if any other web action is missing the annotation):
 | Action | Why it has no IMS check |
 |---|---|
 | `storefront/stock` | Called by anonymous shoppers' browsers on the storefront, which have no IMS token. A shared secret in storefront JS would be public, so it wouldn't be real auth either. Kept safe by scope: read-only, one SKU's stock per call, ERP key never leaves the server, CORS limited to the configured origin. |
-| `order/events-consumer`, `product/events-consumer` | `web: "no"` — no public URL at all; only invocable with this namespace's Runtime credentials (I/O Events). aio ignores the annotation on non-web actions. |
+| `order/events-consumer`, `product/events-consumer`, `inventory/low-stock-check` | `web: "no"` — no public URL at all; only invocable with this namespace's Runtime credentials (by I/O Events, or the alarms trigger for low-stock-check). aio ignores the annotation on non-web actions. |
 
 **Verifying after a deploy:**
 
@@ -446,24 +446,25 @@ resources at the *exact* real depth Magento core uses, e.g.
 — getting that wrong doesn't just break the new resource, it silently breaks
 Magento's *entire* ACL tree build for every integration.)
 
-**`Kinex_ZLF31QCAN` (Admin Users) needs a one-time manual step beyond install.**
-Its global `admin_user_authenticate_after` observer denies login to any admin
-user with no row in its `zlf31qcan` table — which is every pre-existing admin
-the first time this module is installed on a Magento instance. Before anyone
-tries to log in (including this app's own `auth/login` and the product-status
-sync's admin session login — both go through the same observer), run this once
-per existing admin:
+**`Kinex_ZLF31QCAN` (Admin Users) uses Magento's own Active/Inactive flag.** The
+Admin Users page reads and writes `admin_user.is_active`, the same "This account is
+Active / Inactive" setting as Magento Admin → System → Permissions → All Users, so
+both always agree. Magento core blocks inactive admins at login itself (Admin panel
+and `/V1/integration/admin/token`, which is what this app's `auth/login` uses).
+The module exists only because Magento has **no REST API for admin users**:
+`Magento_User` ships no `webapi.xml` (verified on 2.4.7-p3). Deactivating also
+revokes that admin's existing API tokens, and the API refuses to deactivate the last
+active admin.
+
+Earlier versions kept a second, separate status in a `zlf31qcan` table with their own
+login blocker. A data patch migrated that once (anyone it was blocking got
+`is_active = 0`, so nobody regained access), and the old table is now unused. There's
+no post-install step any more. If every admin ever ends up inactive by mistake (for
+example via Magento Admin), the recovery command sets the native flag:
 
 ```bash
-# right after installing the module, before anyone tries to log in
-bin/magento kinex:zlf31qcan:activate --all
-# or one at a time:
-bin/magento kinex:zlf31qcan:activate <username>
+bin/magento kinex:zlf31qcan:activate <username>   # or --all
 ```
-
-(`Console/Command/ActivateAdminUserCommand.php` — also the only way back in if
-every admin user ever ends up inactive by mistake, since the App Builder UI
-itself needs a working admin login to load.)
 
 ---
 
@@ -627,6 +628,171 @@ other documented simplifications in this file.
 
 ---
 
+## 5c. Customer Management — default Magento REST only, no custom module
+
+`actions-src/customer/*` proxies Magento's own customer REST API through the same
+§2b OAuth1 integration. Every route below was verified in this install's
+`vendor/magento/module-customer/etc/webapi.xml` (2.4.7-p3):
+
+| Action | Magento endpoint | Magento ACL |
+|---|---|---|
+| `customer/list` | `GET /V1/customers/search` (each search word OR-matched across `email`/`firstname`/`lastname`; words AND-ed; newest first) | `Magento_Customer::customer` |
+| `customer/get` | `GET /V1/customers/{id}` | `Magento_Customer::customer` |
+| `customer/create` | `POST /V1/customers` — **no password sent** | anonymous route; setting `group_id` needs admin rights (`AccountManagementApi`) |
+| `customer/delete` | `DELETE /V1/customers/{id}` | `Magento_Customer::delete` |
+| `customer/options` | `GET /V1/customerGroups/search`, `/V1/customerGroups/default`, `/V1/store/websites`, `/V1/store/storeViews` | `Magento_Customer::group`, `Magento_Backend::store` |
+
+The §2b integration has `Magento_Backend::all`, which covers all of these.
+
+**Behaviors worth knowing:**
+- **Create sends no password.** Magento emails the customer a link to set their own,
+  from the store view chosen in the form, so admins never choose or see customer
+  passwords. The email needs mail sending configured in Magento; the account is
+  created either way. REST-created accounts skip email confirmation
+  (`AccountManagementApi::createAccount` clears it).
+- **Delete keeps orders.** Magento keeps the customer's orders; they just stop being
+  linked to an account. The UI's confirmation dialog says so.
+- **Id 0 is filtered out** of groups ("NOT LOGGED IN"), websites and store views (the
+  built-in admin scope), since none can be assigned to a customer. Inactive store
+  views are hidden too.
+- These actions replaced four earlier template actions that saved "customers" in
+  Adobe I/O State and never touched Magento.
+
+**Error handling** (`actions-src/utils/adobe-commerce/errors.ts`,
+`commerceErrorResponse`). **Every web action uses it**, not just the customer ones;
+the old blanket `500 "Request failed: <raw error text>"` is gone. The frontend shows the
+action's `error` text via `describeError()` in `web-src/src/utils.js`. Two
+deliberate exceptions: `auth/login` checks for a Magento 401 first (there it means the
+admin's own wrong password, so it stays 401), and the public `storefront/stock` answers
+anonymous shoppers with one generic "Stock information is unavailable" (502/504) and
+never names Magento or echoes upstream errors. The non-web events consumers keep their
+own handling, since their responses only ever reach activation logs.
+
+| Magento / network outcome | Action returns |
+|---|---|
+| 400 validation (e.g. duplicate email) | 400 with Magento's message, placeholders filled |
+| 404 | 404 with an action-specific message |
+| 401 / 403 (integration credentials or permissions) | 502, generic message, no Magento detail |
+| 429 | 429 |
+| 5xx | 502 |
+| Timeout (`timeoutMs`: 15s for customer actions) | 504 |
+| Unreachable | 502 |
+| 2xx with the wrong shape | 502 |
+
+**Customer data stays out of logs:** customer actions run at `LOG_LEVEL: info`.
+`AdobeCommerceClient` writes full request URLs (which contain search terms) and
+Magento error bodies only at debug level, and its error-level line logs the path
+without the query string. `commerceErrorResponse` logs Magento's message *template*
+(`%fieldName`), never the filled-in values. `test/customer-list.test.ts` and
+`test/commerce-errors.test.ts` assert this.
+
+---
+
+## 5d. Scheduled low-stock alerts — a `web: "no"` action on a timer
+
+`inventory/low-stock-check` has **no URL**. Adobe I/O Runtime's built-in alarms
+package runs it every 60 minutes, through a trigger and rule declared on the
+`inventory` package in `app.config.yaml`. There's no server or crontab to maintain.
+
+```yaml
+# app.config.yaml (excerpt)
+inventory:
+  actions:
+    $include: ./actions-src/inventory/actions.config.yaml
+  triggers:
+    low-stock-every-hour:
+      feed: /whisk.system/alarms/interval
+      inputs:
+        minutes: 60          # change here + aio app deploy
+  rules:
+    low-stock-every-hour-rule:
+      trigger: low-stock-every-hour
+      action: low-stock-check
+```
+
+**What it does each run** (default Magento REST only, no custom module):
+
+1. `GET /V1/stockItems/lowStock?scopeId=0&qty=<threshold>`
+   (`StockRegistryInterface::getLowStockItems`, ACL `Magento_Catalog::catalog_inventory`).
+   It filters on `qty <= threshold` only.
+2. Drops rows Magento returns that aren't real low stock: products with stock tracking
+   off (`manage_stock` false), then, via `GET /V1/products` filtered by
+   `entity_id in (...)`, configurable/bundle/grouped parents (always qty 0) and
+   disabled products.
+3. Compares against the SKUs it already alerted about (Adobe I/O State key
+   `low-stock-alerted`). It posts **one** `low_stock` notification to the bell for
+   products that are *newly* low. A product alerts again only after it's restocked
+   above the threshold and drops back down.
+
+**Threshold:** `LOW_STOCK_THRESHOLD: 5` in `actions-src/inventory/actions.config.yaml`.
+A change needs `aio app deploy`. It reads the same stock numbers as the Products page's
+Quantity column (the default source), which is right for a single-warehouse store.
+
+**Demo / run it now** instead of waiting for the next hour:
+
+```bash
+# set a product's quantity to 2 on the Products page, then:
+aio rt action invoke inventory/low-stock-check --result
+# -> {"lowStockCount": 1, "newlyLowCount": 1, "notified": true, "newlyLowSkus": ["MB01"], ...}
+# within 15s the app's bell shows "Low stock: 1 product" (+ a toast)
+```
+
+Run it a second time and you get `"notified": false`: the product is still low but
+was already alerted. To see the schedule itself working, check the run history with
+`aio rt activation list --limit 10` and look for `inventory/low-stock-check`.
+
+**The trigger also fires right after every deploy** (seen live: deployed 11:38:37,
+first run 11:39:15), not only on the hour. A manual run started at the same moment
+overlaps with it: both read the alerted list before either saves it. Adobe I/O State
+has no compare-and-set to prevent that, so before posting, a run skips the alert if an
+identical one (same SKUs) was posted in the last 60 seconds. Genuine re-alerts need a
+run in between that sees the product restocked, so they're always further apart. This
+happened for real on the first deploy (two identical alerts), and
+`test/inventory-low-stock-check.test.ts` now covers it.
+
+**Duplicates are also removed on every read.** `loadNotifications()` runs
+`dedupeNotifications()`, which collapses low-stock alerts for the same products posted
+within 60s of each other, and any notifications sharing an order number or id. It keeps
+the newest copy and marks it read if any copy was read. So the bell, the unread badge
+and every writer only ever see one copy, and the next save (e.g. marking a notification
+read) removes the duplicate from storage permanently. That's how the first deploy's
+duplicate got cleaned up, with no manual data edits.
+
+**Notifications now have a `type`** (`order` | `low_stock`, see
+`actions-src/notifications/types/notification.ts`). Entries saved before this have
+no `type` and are treated as orders, so existing order notifications are unaffected.
+The low-stock job and the order consumer share the one notifications key, so the
+read-modify-write race already documented in §5b applies to both. It's acceptable at
+an hourly cadence.
+
+**Failure behavior:** if Magento is slow (15s timeout) or unreachable (for example,
+ngrok isn't running), the run logs the reason, posts nothing and changes no state.
+The next run simply tries again.
+
+---
+
+## 5e. Dashboard — `dashboard/stats`, default Magento REST only
+
+One action gathers every headline number in parallel. Each section loads on its own: if
+one fails, it comes back `null` with a reason in `errors` and the rest still render. The
+action only returns an error status if every section fails.
+
+| Dashboard figure | Magento call |
+|---|---|
+| Today's sales + orders today | `GET /V1/orders`, `created_at >= ` midnight **in the store's timezone** (from `GET /V1/store/storeConfigs`, default store view), `fields=items[base_grand_total,state],total_count`. Sales sum `base_grand_total` in the base currency and **exclude canceled** orders; the order count includes them. Paged 300 at a time, up to 3,000; beyond that `partial: true`. |
+| Total orders | `GET /V1/orders`, `fields=total_count` (count only) |
+| Customers | `GET /V1/customers/search`, `fields=total_count` |
+| Enabled products | `GET /V1/products`, `status eq 1`, `fields=total_count`. This replaced the old "Cached products" count, which came from the app's own Adobe I/O State cache rather than Magento. |
+| Active admins | `GET /V1/kinex-admin-users` (Kinex_ZLF31QCAN, which reads Magento's native `is_active`; Magento has no admin-user REST API) |
+
+**Why the store timezone matters:** Magento stores `created_at` in UTC. A UTC "today"
+for a Toronto store would start at 8pm local time the day before. If the store
+timezone can't be read, the "today" section fails rather than guessing UTC.
+(`startOfTodayUtc` uses the current UTC offset, so on the two DST-change days a year,
+"today" can start an hour early or late.)
+
+---
+
 ## 6. Quick checklist — setting this up on a new machine
 
 1. `aio app use` → picks the Adobe org/project/workspace, writes §1's block into
@@ -641,10 +807,21 @@ other documented simplifications in this file.
 5. Magento Admin → Stores → Configuration → General → Storefront Stock Widget →
    fill in the ERP URL/key and allowed origin (§3) — skip this if you're not using
    the storefront stock widget.
-6. Enable `Kinex_ZLF31QCAN`, run `setup:upgrade`, then immediately run
-   `bin/magento kinex:zlf31qcan:activate --all` (§5) before anyone tries to log
-   in — skip only if you're not using Admin User management.
+6. Enable `Kinex_ZLF31QCAN` and run `setup:upgrade` (§5). No activation step is needed:
+   admins keep the Active/Inactive status Magento already has.
 7. `aio app deploy` → regenerates `web-src/src/config.json` (§4) and pushes
    everything live.
+7a. Make sure Magento itself is healthy, or the app's pages will time out or fail.
+   Each of these was found broken on this machine:
+   - **Caches on:** `php bin/magento cache:enable`. With 17 of 18 caches off, every
+     request took 15–33s, so the Customers page hit its 15s timeout.
+   - **Search engine matches what's running:** this Mac runs Homebrew OpenSearch on
+     `localhost:9200`, so the engine must be `opensearch`. `app/etc/config.php` locks it
+     to `elasticsearch7` (port 9250, nothing there), so it's overridden locally:
+     `php bin/magento config:set --lock-env catalog/search/engine opensearch`.
+     Without this the Catalog Search reindex fails with "No alive nodes found in your
+     cluster".
+   - **ngrok running** after any restart: `ngrok http 80` (the free static domain
+     stays the same, so no `.env` change is needed).
 8. Open the app through the Experience Cloud Shell URL that `aio app deploy`
    prints, not the bare static URL — every action requires an IMS token (§1a).

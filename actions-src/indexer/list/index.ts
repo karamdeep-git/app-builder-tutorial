@@ -1,7 +1,8 @@
-import { initializeLogger, logError } from "../../logger";
-import { actionErrorResponse, successResponse } from "../../responses";
-import { AppResponse, HttpStatus } from "../../types/request";
+import { initializeLogger } from "../../logger";
+import { successResponse } from "../../responses";
+import { AppResponse } from "../../types/request";
 import { AdobeCommerceClient } from "../../utils/adobe-commerce/adobe-commerce-client";
+import { commerceErrorResponse } from "../../utils/adobe-commerce/errors";
 import { IndexerListParams } from "../types/request";
 
 export interface IndexerStatus {
@@ -25,8 +26,6 @@ export async function main(params: IndexerListParams): Promise<AppResponse> {
 
     return successResponse("Indexers", { indexers });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, `Request failed: ${errorMessage}`);
+    return commerceErrorResponse(error, "Indexer list");
   }
 }

@@ -1,7 +1,8 @@
 import axios from "axios";
-import { initializeLogger, logError } from "../../logger";
+import { initializeLogger } from "../../logger";
 import { actionErrorResponse } from "../../responses";
 import { AppResponse, HttpStatus } from "../../types/request";
+import { commerceErrorResponse } from "../../utils/adobe-commerce/errors";
 import { ProductImageParams } from "../types/request";
 
 // Only simple path segments - blocks "://", "@" and anything else that could
@@ -53,8 +54,6 @@ export async function main(params: ProductImageParams): Promise<AppResponse> {
       body: Buffer.from(response.data).toString("base64"),
     };
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logError(`Server error: ${errorMessage}`);
-    return actionErrorResponse(HttpStatus.INTERNAL_ERROR, `Request failed: ${errorMessage}`);
+    return commerceErrorResponse(error, "Product image", "Image not found.");
   }
 }

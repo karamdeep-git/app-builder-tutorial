@@ -17,7 +17,7 @@ import {
 } from "@adobe/react-spectrum";
 
 import allActions from "../config.json";
-import actionWebInvoke from "../utils";
+import actionWebInvoke, { describeError } from "../utils";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -81,7 +81,7 @@ function Indexing({ ims }) {
       const result = await actionWebInvoke(allActions["indexer/list"], authHeaders, {}, { method: "GET" });
       setIndexers(result?.response?.indexers ?? []);
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
     } finally {
       setIsLoading(false);
     }
@@ -115,7 +115,7 @@ function Indexing({ ims }) {
           loadIndexers();
         }
       } catch (e) {
-        setError(e.message);
+        setError(describeError(e));
         clearInterval(pollRef.current);
         pollRef.current = null;
       }
@@ -144,7 +144,7 @@ function Indexing({ ims }) {
       setJob((current) => ({ ...current, jobId }));
       pollStatus(jobId);
     } catch (e) {
-      setError(e.message);
+      setError(describeError(e));
       setJob(null);
     }
   }
